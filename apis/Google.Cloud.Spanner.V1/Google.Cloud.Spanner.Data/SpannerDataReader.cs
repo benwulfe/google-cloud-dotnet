@@ -312,14 +312,16 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
+            _resultset?.Close();
             _connectionToClose?.Close();
+            base.Dispose(disposing);
         }
 
 #if NET451
         /// <inheritdoc />
         public override void Close()
         {
-            _resultset.Close();
+            _resultset?.Close();
         }
 
         /// <inheritdoc />

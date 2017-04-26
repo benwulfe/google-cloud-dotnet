@@ -348,10 +348,12 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public async Task<T> ExecuteScalarAsync<T>(CancellationToken cancellationToken)
         {
-            var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken);
-            if (await reader.ReadAsync(cancellationToken) && reader.HasRows && reader.FieldCount > 0)
+            using (var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken))
             {
-                return reader.GetFieldValue<T>(0);
+                if (await reader.ReadAsync(cancellationToken) && reader.HasRows && reader.FieldCount > 0)
+                {
+                    return reader.GetFieldValue<T>(0);
+                }
             }
             return default(T);
         }
@@ -359,10 +361,12 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override async Task<object> ExecuteScalarAsync(CancellationToken cancellationToken)
         {
-            var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken);
-            if (await reader.ReadAsync(cancellationToken) && reader.HasRows && reader.FieldCount > 0)
+            using (var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken))
             {
-                return reader[0];
+                if (await reader.ReadAsync(cancellationToken) && reader.HasRows && reader.FieldCount > 0)
+                {
+                    return reader[0];
+                }
             }
             return null;
         }

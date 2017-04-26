@@ -322,9 +322,12 @@ namespace Google.Cloud.Spanner
             _connectionStringBuilder = newBuilder;
         }
 
+
+
         internal async Task<CommitResponse> CommitAsync(List<Mutation> mutations, CancellationToken cancellationToken)
         {
             var sessionToUse = await AllocateSession(cancellationToken);
+            Interlocked.Increment(ref _executingCount);
             try
             {
                 return await _client.CommitAsync(sessionToUse.SessionName,
@@ -332,7 +335,8 @@ namespace Google.Cloud.Spanner
             }
             finally
             {
-                await sessionToUse.ReleaseToPool();
+                Interlocked.Decrement(ref _executingCount);
+                await ReleaseSession(sessionToUse);
             }
         }
 
@@ -346,16 +350,21 @@ namespace Google.Cloud.Spanner
             streamReader.StreamClosed += async (o, e) =>
             {
                 Interlocked.Decrement(ref _executingCount);
-                if (ReferenceEquals(sessionToUse, _session))
-                {
-                    Interlocked.Exchange(ref _sessionInUse, 0);
-                }
-                else
-                {
-                    await sessionToUse.ReleaseToPool();
-                }
+                await ReleaseSession(sessionToUse);
             };
             return streamReader;
+        }
+
+        private async Task ReleaseSession(Session session)
+        {
+            if (ReferenceEquals(session, _session))
+            {
+                Interlocked.Exchange(ref _sessionInUse, 0);
+            }
+            else
+            {
+                await session.ReleaseToPool();
+            }
         }
 
         private async Task<Session> AllocateSession(CancellationToken cancellationToken)
