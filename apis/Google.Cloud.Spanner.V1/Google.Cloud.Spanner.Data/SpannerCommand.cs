@@ -273,33 +273,35 @@ namespace Google.Cloud.Spanner
             List<Mutation> mutations = new List<Mutation>();
             if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Delete)
             {
-                var w = new Mutation.Types.Write {Table = SpannerCommandTextBuilder.TargetTable};
-                w.Columns.AddRange(Parameters.Cast<SpannerParameter>().Select(x => x.SourceColumn ?? x.ParameterName));
-                w.Values.Add(new ListValue {
-                    Values = {Parameters.Cast<SpannerParameter>().Select(x => TypeMap.ToValue(x.Value, x.TypeCode))}
-                });
-                switch (SpannerCommandTextBuilder.SpannerCommandType)
+                for (int i = 0; i < 1000; i++)
                 {
-                    case SpannerCommandType.Update:
-                        mutations.Add(new Mutation
-                        {
-                            Update = w
-                        });
-                        break;
-                    case SpannerCommandType.Insert:
-                        mutations.Add(new Mutation
-                        {
-                            Insert = w
-                        });
-                        break;
-                    case SpannerCommandType.InsertOrUpdate:
-                        mutations.Add(new Mutation
-                        {
-                            InsertOrUpdate = w
-                        });
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
+                    var w = new Mutation.Types.Write {Table = SpannerCommandTextBuilder.TargetTable};
+                    Parameters["ID"].Value = (long) Parameters["ID"].Value + 1;
+                    w.Columns.AddRange(Parameters.Cast<SpannerParameter>()
+                        .Select(x => x.SourceColumn ?? x.ParameterName));
+                    w.Values.Add(new ListValue {
+                        Values = {Parameters.Cast<SpannerParameter>().Select(x => TypeMap.ToValue(x.Value, x.TypeCode))}
+                    });
+                    switch (SpannerCommandTextBuilder.SpannerCommandType)
+                    {
+                        case SpannerCommandType.Update:
+                            mutations.Add(new Mutation {
+                                Update = w
+                            });
+                            break;
+                        case SpannerCommandType.Insert:
+                            mutations.Add(new Mutation {
+                                Insert = w
+                            });
+                            break;
+                        case SpannerCommandType.InsertOrUpdate:
+                            mutations.Add(new Mutation {
+                                InsertOrUpdate = w
+                            });
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
                 }
             }
             else

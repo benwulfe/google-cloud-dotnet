@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Api.Gax;
@@ -40,13 +39,13 @@ namespace Google.Cloud.Spanner.V1
             _request = request;
             _session = session;
             _clock = SpannerSettings.GetDefault().Clock ?? SystemClock.Instance;
-            _scheduler = SpannerSettings.GetDefault().Scheduler ?? (IScheduler) SystemScheduler.Instance;
+            _scheduler = SpannerSettings.GetDefault().Scheduler ?? SystemScheduler.Instance;
 
             _callTiming = CallSettings.FromCallTiming(CallTiming.FromRetry(new RetrySettings(
-                    retryBackoff: SpannerSettings.GetDefaultRetryBackoff(),
-                    timeoutBackoff: SpannerSettings.GetDefaultTimeoutBackoff(),
-                    totalExpiration: Expiration.FromTimeout(TimeSpan.FromMilliseconds(600000)),
-                    retryFilter: SpannerSettings.IdempotentRetryFilter
+                    SpannerSettings.GetDefaultRetryBackoff(),
+                    SpannerSettings.GetDefaultTimeoutBackoff(),
+                    Expiration.FromTimeout(TimeSpan.FromMilliseconds(600000)),
+                    SpannerSettings.IdempotentRetryFilter
                 )));
             _request.SessionAsSessionName = _session.SessionName;
         }
@@ -62,36 +61,35 @@ namespace Google.Cloud.Spanner.V1
         }
 
         /// <summary>
-        /// Ensures we have executed the query initially or from recovery and have read the initial metadata
+        /// Connects or reconnects to Spanner, fast forwarding to where we left off based on
+        /// our _resumeToken and _resumeSkipCount.
         /// </summary>
         /// <returns></returns>
         private async Task<bool> ReliableConnect(CancellationToken cancellationToken)
         {
             if (_currentCall == null)
             {
-                Func<Task<Metadata>> connectFn = ConnectAsync;
-                var responseHeaders = await connectFn.CallWithRetry(_callTiming, _clock, _scheduler);
+//                Func<Task<Metadata>> connectFn = ConnectAsync;
+//                var responseHeaders = await connectFn.CallWithRetry(_callTiming, _clock, _scheduler);
+                await ConnectAsync();
 
                 Debug.Assert(_currentCall != null, "_currentCall != null");
                 cancellationToken.ThrowIfCancellationRequested();
 
                 for (int i = 0; i <= _resumeSkipCount; i++)
                 {
+                    //This calls a simple movenext on purpose.  If we get an error here, we'll fail out.
                     _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken);
-                    if (!_isReading)
+                    if (!_isReading || _currentCall.ResponseStream.Current == null)
                     {
                         return false;
                     }
-                }
-                if (_currentCall.ResponseStream.Current == null)
-                {
-                    throw new InvalidOperationException("stream read error!");
+                    if (_metadata == null)
+                    {
+                        _metadata = _currentCall.ResponseStream.Current.Metadata;
+                    }
                 }
                 RecordResumeToken();
-                if (_metadata == null)
-                {
-                    _metadata = _currentCall.ResponseStream.Current.Metadata;
-                }
             }
             return _isReading;
         }
@@ -100,14 +98,18 @@ namespace Google.Cloud.Spanner.V1
         {
             try
             {
+                //we increment our skip count before calling MoveNext so that a reconnect operation
+                //will fast forward to the proper place.
                 _resumeSkipCount++;
-                await _currentCall.ResponseStream.MoveNext(cancellationToken);
+                _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken);
             }
-            catch (Exception e)  //todo idempotent filter.
+            catch (Exception)  //todo log the exception.
             {
                 //reconnect on failure which will call reliableconnect and respect resumetoken and resumeskip
                 cancellationToken.ThrowIfCancellationRequested();
                 _currentCall = null;
+                //when we reconnect, we purposely do not do a *reliable*movenext.  If we fail to fast forward on the reconnect
+                //we bail out completely and surface the error.
                 return await ReliableConnect(cancellationToken);
             }
             RecordResumeToken();
@@ -193,6 +195,22 @@ namespace Google.Cloud.Spanner.V1
         /// <returns></returns>
         public async Task<Value> Next(CancellationToken cancellationToken)
         {
+            Value result = await NextChunk(cancellationToken);
+            while (result != null && _currentCall.ResponseStream.Current.ChunkedValue &&
+                   _currentIndex >= _currentCall.ResponseStream.Current.Values.Count)
+            {
+                result.ChunkedMerge(await NextChunk(cancellationToken));
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<Value> NextChunk(CancellationToken cancellationToken)
+        {
             if (!await HasData(cancellationToken))
             {
                 return null;
@@ -208,6 +226,7 @@ namespace Google.Cloud.Spanner.V1
                 }
             }
             var result = _currentCall.ResponseStream.Current.Values[_currentIndex];
+            
             _currentIndex++;
             return result;
         }
