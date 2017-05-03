@@ -13,8 +13,12 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Threading;
+using System.Threading.Tasks;
+using Google.Cloud.Spanner.V1;
 
 // ReSharper disable UnusedParameter.Local
 
@@ -22,38 +26,120 @@ namespace Google.Cloud.Spanner
 {
     /// <summary>
     /// </summary>
-    public sealed class SpannerTransaction : DbTransaction
+    public sealed class SpannerTransaction : DbTransaction, ISpannerTransaction
     {
+        private readonly SpannerConnection _connection;
+        private readonly Transaction _transaction;
+        private readonly List<Mutation> _mutations = new List<Mutation>();
+
+        internal SpannerTransaction(SpannerConnection connection, TransactionMode mode, Session session, Transaction transaction) 
+        {
+            Session = session;
+            _transaction = transaction;
+            _connection = connection;
+            Mode = mode;
+        }
+
+        /// <inheritdoc />
+        public override IsolationLevel IsolationLevel => IsolationLevel.Serializable;
+
+        /// <inheritdoc />
+        protected override DbConnection DbConnection => _connection;
+
         /// <summary>
+        /// 
         /// </summary>
-        /// <param name="dbConnection"></param>
-        public SpannerTransaction(DbConnection dbConnection)
-        {
-            throw new NotImplementedException();
-        }
+        public TransactionMode Mode { get; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public Session Session { get; }
 
         /// <inheritdoc />
-        public override IsolationLevel IsolationLevel
+        protected override void Dispose(bool disposing)
         {
-            get { throw new NotImplementedException(); }
-        }
-
-        /// <inheritdoc />
-        protected override DbConnection DbConnection
-        {
-            get { throw new NotImplementedException(); }
+            _connection.ReleaseSession(Session).Start();
         }
 
         /// <inheritdoc />
         public override void Commit()
         {
-            throw new NotImplementedException();
+            CommitAsync().Wait();
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public async Task CommitAsync()
+        {
+            Mode.Precondition(x => x != TransactionMode.ReadOnly, "You cannot commit a readonly transaction.");
+            await _transaction.CommitAsync(Session, Mutations);
+        }
+
+        internal IEnumerable<Mutation> Mutations => _mutations;
 
         /// <inheritdoc />
         public override void Rollback()
         {
-            throw new NotImplementedException();
+            RollbackAsync().Wait();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public async Task RollbackAsync()
+        {
+            Mode.Precondition(x => x == TransactionMode.ReadOnly, "You cannot roll back a readonly transaction.");
+            await _transaction.RollbackAsync(Session);
+        }
+
+        private void CheckCompatibleMode(TransactionMode mode)
+        {
+            switch (mode)
+            {
+                case TransactionMode.ReadOnly:
+                    Mode.Precondition(x => x == TransactionMode.ReadOnly || x == TransactionMode.ReadWrite,
+                        "You can only execute reads on a ReadWrite or ReadOnly Transaction!");
+                    break;
+                case TransactionMode.ReadWrite:
+                    Mode.Precondition(x => x == TransactionMode.ReadWrite,
+                        "You can only execute read/write commands on a ReadWrite Transaction!");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+            }
+        }
+
+        private TransactionSelector GetTransactionSelector(TransactionMode mode)
+        {
+            CheckCompatibleMode(mode);
+            _transaction.Precondition(x => x != null, "Transaction should have been created prior to use.");
+            return new TransactionSelector { Id = _transaction?.Id };
+        }
+
+        Task<int> ISpannerTransaction.ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
+        {
+            CheckCompatibleMode(TransactionMode.ReadWrite);
+
+            TaskCompletionSource<int> taskCompletionSource = new TaskCompletionSource<int>();
+            cancellationToken.ThrowIfCancellationRequested();
+            _mutations.AddRange(mutations);
+            taskCompletionSource.SetResult(mutations.Count);
+            return taskCompletionSource.Task;
+        }
+
+        Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
+        {
+            TaskCompletionSource<ReliableStreamReader> taskCompletionSource = new TaskCompletionSource<ReliableStreamReader>();
+            taskCompletionSource.SetResult(_connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest {
+                Sql = sql,
+                Transaction = GetTransactionSelector(TransactionMode.ReadOnly)
+            }, Session));
+
+            return taskCompletionSource.Task;
         }
     }
 }

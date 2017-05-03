@@ -147,6 +147,11 @@ namespace Google.Cloud.Spanner.V1
 
         /// <summary>
         /// 
+        /// </summary>
+        public Session Session => _session;
+
+        /// <summary>
+        /// 
         /// 
         /// </summary>
         public void Close()

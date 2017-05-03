@@ -33,7 +33,7 @@ namespace Google.Cloud.Spanner
         , ICloneable
 #endif
     {
-        private readonly SpannerTransaction _transaction;
+        private SpannerTransaction _transaction;
         private readonly CancellationTokenSource _synchronousCancellationTokenSource = new CancellationTokenSource();
         private int _commandTimeout;
 
@@ -100,6 +100,18 @@ namespace Google.Cloud.Spanner
         /// </summary>
         public new SpannerParameterCollection Parameters { get; private set; }
 
+        internal ISpannerTransaction SpannerTransactionImpl
+        {
+            get
+            {
+                if (_transaction != null)
+                {
+                    return _transaction;
+                }
+                return new EphemeralTransaction(SpannerConnection);
+            }
+        }
+
         /// <summary>
         /// </summary>
         public SpannerConnection SpannerConnection { get; set; }
@@ -124,8 +136,8 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override DbTransaction DbTransaction
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get { return _transaction; }
+            set { _transaction = (SpannerTransaction)value; }
         }
 
         /// <summary>
@@ -155,7 +167,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void Prepare()
         {
-            //Spanner does not support preoptimized queries.
+            //Spanner does not support preoptimized queries nor 2 phase commit transactions.
         }
 
         /// <inheritdoc />
@@ -208,8 +220,7 @@ namespace Google.Cloud.Spanner
                 throw new InvalidOperationException(
                     "You must assign a SpannerConnection to this command to execute it.");
             }
-            if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Select
-                && SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Read)
+            if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Select)
             {
                 throw new InvalidOperationException("You can only call ExecuteReader on a Select or Read Command");
             }
@@ -223,20 +234,8 @@ namespace Google.Cloud.Spanner
                 throw new InvalidOperationException("Unable to open the Spanner connection to the database.");
             }
 
-            string sql;
-            if (SpannerCommandTextBuilder.SpannerCommandType == SpannerCommandType.Read)
-            {
-                sql = $"SELECT * FROM {SpannerCommandTextBuilder.TargetTable}";  //TODO, actual READ calls (not SELECT QUERIES)
-            }
-            else
-            {
-                sql = CommandText;
-            }
             // Execute the command.
-            var resultset = await SpannerConnection.ExecuteSqlAsync(new ExecuteSqlRequest
-            {
-                Sql = sql,
-            }, cancellationToken);
+            var resultset = await SpannerTransactionImpl.ExecuteQueryAsync(CommandText, cancellationToken);
 
             if ((behavior & CommandBehavior.CloseConnection) == CommandBehavior.CloseConnection)
                 return new SpannerDataReader(resultset, SpannerConnection);
@@ -324,9 +323,8 @@ namespace Google.Cloud.Spanner
                 }
             }
 
-
-            // Make the request
-            await SpannerConnection.CommitAsync(mutations, cancellationToken);
+            // Make the request.  This will commit immediately or not depending on whether a transaction was explicitly created.
+            await SpannerTransactionImpl.ExecuteMutationsAsync(mutations, cancellationToken);
 
             // Return the number of records affected.
             return mutations.Count;

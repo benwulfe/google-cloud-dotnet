@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -115,15 +114,16 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="project"></param>
         /// <param name="spannerInstance"></param>
         /// <param name="spannerDatabase"></param>
+        /// <param name="options"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         public static async Task<Session> CreateSessionFromPoolAsync(this SpannerClient spannerClient,
-            string project, string spannerInstance, string spannerDatabase, CancellationToken cancellationToken)
+            string project, string spannerInstance, string spannerDatabase, TransactionOptions options, CancellationToken cancellationToken)
         {
             project.ThrowIfNullOrEmpty(nameof(project));
             spannerInstance.ThrowIfNullOrEmpty(nameof(spannerInstance));
             spannerDatabase.ThrowIfNullOrEmpty(nameof(spannerDatabase));
-
+            
             await StartSessionCreating(cancellationToken);
             try
             {
@@ -135,7 +135,7 @@ namespace Google.Cloud.Spanner.V1
                 };
                 SessionPoolImpl targetPool = GlobalPool.GetOrAdd(sessionPoolKey, key => new SessionPoolImpl(key));
 
-                var session = await targetPool.AcquireSessionAsync(cancellationToken);
+                var session = await targetPool.AcquireSessionAsync(options, cancellationToken);
                 if (session != null)
                 {
                     //refresh the mru list which tells us what sessions need to be trimmed from the pool when we want
@@ -166,21 +166,10 @@ namespace Google.Cloud.Spanner.V1
         /// Releases a session back into the pool, possibly causing another entry to be evicted if the maximum pool size has been
         /// reached.
         /// </summary>
-        /// <param name="spannerClient"></param>
         /// <param name="session"></param>
+        /// <param name="client"></param>
         /// <returns></returns>
-        public static async Task ReleaseSessionToPoolAsync(this SpannerClient spannerClient, Session session)
-        {
-            await session.ReleaseToPool();
-        }
-
-        /// <summary>
-        /// Releases a session back into the pool, possibly causing another entry to be evicted if the maximum pool size has been
-        /// reached.
-        /// </summary>
-        /// <param name="session"></param>
-        /// <returns></returns>
-        public static async Task ReleaseToPool(this Session session)
+        public static async Task ReleaseToPool(this SpannerClient client, Session session )
         {
             session.ThrowIfNull(nameof(session));
 
@@ -197,7 +186,7 @@ namespace Google.Cloud.Spanner.V1
                 //Figure out if we want to pool this released session.
                 lock (s_priorityListSync)
                 {
-                    targetPool.ReleaseSessionToPool(session);
+                    targetPool.ReleaseSessionToPool(client, session);
                     if (CurrentPooledSessions > MaximumPooledSessions)
                     {
                         var evictionPool = PriorityList.First().Value;
@@ -209,6 +198,7 @@ namespace Google.Cloud.Spanner.V1
                 }
                 if (evictionSession != null)
                 {
+                    await evictionSession.RemoveFromTransactionPool();
                     await evictionClient.DeleteSessionAsync(evictionSession.SessionName);
                 }
             }
@@ -288,6 +278,14 @@ namespace Google.Cloud.Spanner.V1
         /// This value must be less than the expire timer on the Spanner server currently set at 60 minutes.
         /// </summary>
         public static TimeSpan PoolEvictTimeSpan { get; set; } = TimeSpan.FromMinutes(15);
+
+
+        /// <summary>
+        /// If set to true, Sessions placed back into the pool will have a new transaction created in the background with
+        /// the same settings that were just used.  This will allow a later consumer of this session to skip creating a new
+        /// transaction if the options were identical.
+        /// </summary>
+        public static bool UseTransactionWarming { get; set; } = true;
 
     }
 }

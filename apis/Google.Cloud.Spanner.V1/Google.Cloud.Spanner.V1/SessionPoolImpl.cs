@@ -8,9 +8,13 @@ namespace Google.Cloud.Spanner.V1
 {
     internal class SessionPoolImpl : IComparable
     {
+        //This is the maximum we will search for a matching transaction option session.
+        //We'll normally not hit this, but this is to stop abnormal cases where almost all
+        //cached sessions are of one type, but another type is requested.
+        private const int MaximumLinearSearchDepth = 50;
+
         private readonly List<SessionPoolEntry> _sessionMruStack = new List<SessionPoolEntry>();
         private int _lastAccessTime;
-
         private static int s_activeSessionsPooled;
 
 
@@ -62,14 +66,33 @@ namespace Google.Cloud.Spanner.V1
             }
         }
 
-        private bool TryPop(out SessionPoolEntry entry)
+        private bool TryPop(TransactionOptions options, out SessionPoolEntry entry)
         {
+            entry = new SessionPoolEntry();
+            //we make a reasonable attempt at obtaining a session with the given transactionoptions.
+            //but its not guaranteed.
             lock (_sessionMruStack)
             {
                 if (_sessionMruStack.Count > 0)
                 {
-                    entry = _sessionMruStack[0];
-                    _sessionMruStack.RemoveAt(0);
+                    bool found = false;
+                    for (int indexToUse = 0; indexToUse < _sessionMruStack.Count
+                        && indexToUse < MaximumLinearSearchDepth; indexToUse++)
+                    {
+                        entry = _sessionMruStack[indexToUse];
+                        if (Equals(entry.Session.GetLastUsedTransactionOptions(), options))
+                        {
+                            found = true;
+                            _sessionMruStack.RemoveAt(indexToUse);
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        entry = _sessionMruStack[0];
+                        _sessionMruStack.RemoveAt(0);
+                    }
+
                     Interlocked.Decrement(ref s_activeSessionsPooled);
                     return true;
                 }
@@ -87,10 +110,10 @@ namespace Google.Cloud.Spanner.V1
             }
         }
 
-        public async Task<Session> AcquireSessionAsync(CancellationToken cancellationToken)
+        public async Task<Session> AcquireSessionAsync(TransactionOptions options, CancellationToken cancellationToken)
         {
             SessionPoolEntry sessionEntry;
-            if (!TryPop(out sessionEntry))
+            if (!TryPop(options, out sessionEntry))
             {
                 //create a new session, blocking or throwing if at the limit.
                 return await Key.Client.CreateSessionAsync(new DatabaseName(Key.Project, Key.Instance, Key.Database), cancellationToken);
@@ -128,7 +151,7 @@ namespace Google.Cloud.Spanner.V1
             _lastAccessTime = Environment.TickCount;
         }
 
-        public void ReleaseSessionToPool(Session session)
+        public void ReleaseSessionToPool(SpannerClient client, Session session)
         {
             //start evict timer.
             SessionPoolEntry entry = new SessionPoolEntry {
@@ -136,6 +159,10 @@ namespace Google.Cloud.Spanner.V1
                 EvictTaskCancellationSource = new CancellationTokenSource()
             };
 
+            if (SessionPool.UseTransactionWarming)
+            {
+                client.PreWarmTransactionAsync(entry.Session).Start();
+            }
             Push(entry);
             //kick off the pool eviction timer.  This gets canceled when the item is pulled from the pool.
             Task.Run(() => EvictSessionPoolEntry(entry.Session, entry.EvictTaskCancellationSource.Token),

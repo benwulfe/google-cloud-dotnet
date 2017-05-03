@@ -38,8 +38,5 @@ namespace Google.Cloud.Spanner
         /// </summary>
         InsertOrUpdate = 4,
 
-        /// <summary>
-        /// </summary>
-        Read = 5
     }
 }
