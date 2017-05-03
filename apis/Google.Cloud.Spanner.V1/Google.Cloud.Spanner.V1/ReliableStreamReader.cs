@@ -57,7 +57,7 @@ namespace Google.Cloud.Spanner.V1
                 _request.ResumeToken = _resumeToken;
             }
             _currentCall = _spannerClient.ExecuteSqlStream(_request);
-            return await _currentCall.ResponseHeadersAsync;
+            return await _currentCall.ResponseHeadersAsync.ConfigureAwait(false);
         }
 
         /// <summary>
@@ -71,7 +71,7 @@ namespace Google.Cloud.Spanner.V1
             {
 //                Func<Task<Metadata>> connectFn = ConnectAsync;
 //                var responseHeaders = await connectFn.CallWithRetry(_callTiming, _clock, _scheduler);
-                await ConnectAsync();
+                await ConnectAsync().ConfigureAwait(false);
 
                 Debug.Assert(_currentCall != null, "_currentCall != null");
                 cancellationToken.ThrowIfCancellationRequested();
@@ -101,7 +101,7 @@ namespace Google.Cloud.Spanner.V1
                 //we increment our skip count before calling MoveNext so that a reconnect operation
                 //will fast forward to the proper place.
                 _resumeSkipCount++;
-                _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken);
+                _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception)  //todo log the exception.
             {
@@ -136,7 +136,7 @@ namespace Google.Cloud.Spanner.V1
         /// <returns></returns>
         public async Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
         {
-            await ReliableConnect(cancellationToken);
+            await ReliableConnect(cancellationToken).ConfigureAwait(false);
             return _metadata;
         }
 
@@ -200,7 +200,7 @@ namespace Google.Cloud.Spanner.V1
         /// <returns></returns>
         public async Task<Value> Next(CancellationToken cancellationToken)
         {
-            Value result = await NextChunk(cancellationToken);
+            Value result = await NextChunk(cancellationToken).ConfigureAwait(false);
             while (result != null && _currentCall.ResponseStream.Current.ChunkedValue &&
                    _currentIndex >= _currentCall.ResponseStream.Current.Values.Count)
             {
@@ -216,7 +216,7 @@ namespace Google.Cloud.Spanner.V1
         /// <returns></returns>
         public async Task<Value> NextChunk(CancellationToken cancellationToken)
         {
-            if (!await HasData(cancellationToken))
+            if (!await HasData(cancellationToken).ConfigureAwait(false))
             {
                 return null;
             }

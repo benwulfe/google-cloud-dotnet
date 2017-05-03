@@ -26,7 +26,7 @@ namespace Google.Cloud.Spanner
                 Endpoint = endpoint ?? SpannerClient.DefaultEndpoint
             };
             ClientPoolEntry poolEntry = s_clientEntryPool.GetOrAdd(key, k => new ClientPoolEntry(key));
-            return await poolEntry.AcquireClientFromEntryAsync();
+            return await poolEntry.AcquireClientFromEntryAsync().ConfigureAwait(false);
         }
 
         public static int Timeout { get; set; }
@@ -38,7 +38,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static async Task CloseAllAsync()
         {
-            await SpannerClient.ShutdownDefaultChannelsAsync();
+            await SpannerClient.ShutdownDefaultChannelsAsync().ConfigureAwait(false);
             s_clientEntryPool.Clear();
         }
 
@@ -69,11 +69,11 @@ namespace Google.Cloud.Spanner
                             new SpannerSettings
                             {
                                 CallSettings = CallSettings.FromCallCredentials(_key.Credential.ToCallCredentials())
-                            });
+                            }).ConfigureAwait(false);
                     }
                     else
                     {
-                        _client = await SpannerClient.CreateAsync(_key.Endpoint ?? SpannerClient.DefaultEndpoint);
+                        _client = await SpannerClient.CreateAsync(_key.Endpoint ?? SpannerClient.DefaultEndpoint).ConfigureAwait(false);
                     }
                 }
 

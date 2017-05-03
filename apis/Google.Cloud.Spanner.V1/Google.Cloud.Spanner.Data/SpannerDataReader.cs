@@ -73,7 +73,7 @@ namespace Google.Cloud.Spanner
             if (_fieldIndex == null)
             {
                 _fieldIndex = new Dictionary<string, int>();
-                var metadata = await GetMetadataAsync(cancellationToken);
+                var metadata = await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
                 if (metadata != null)
                 {
                     int i = 0;
@@ -285,16 +285,16 @@ namespace Google.Cloud.Spanner
 
         private async Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
         {
-            return _metadata ?? (_metadata = await _resultset.GetMetadataAsync(cancellationToken));
+            return _metadata ?? (_metadata = await _resultset.GetMetadataAsync(cancellationToken).ConfigureAwait(false));
         }
 
         /// <inheritdoc />
         public override async Task<bool> ReadAsync(CancellationToken cancellationToken)
         {
-            await GetMetadataAsync(cancellationToken);
+            await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
             _innerList.Clear();
             //read # values == # fields.
-            var first = await _resultset.Next(cancellationToken);
+            var first = await _resultset.Next(cancellationToken).ConfigureAwait(false);
             if (first == null)
             {
                 return false;
@@ -303,7 +303,7 @@ namespace Google.Cloud.Spanner
             //we expect to get full rows...
             for (int i = 0; i < _metadata.RowType.Fields.Count - 1; i++)
             {
-                _innerList.Add(await _resultset.Next(cancellationToken));
+                _innerList.Add(await _resultset.Next(cancellationToken).ConfigureAwait(false));
             }
 
             return true;

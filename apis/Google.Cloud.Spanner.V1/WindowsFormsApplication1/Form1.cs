@@ -44,52 +44,52 @@ namespace WindowsFormsApplication1
                 //    }
                 //}
 
-//                long maxId = 0;
-//                int rowsAffected = 0;
-//
-//                for (int i = 0; i < 100; i++)
-//                {
-//                    //QUERY SCALAR
-//                    cmd = connection.CreateSelectCommand("SELECT MAX(ID) FROM Books");
-//                    maxId = await cmd.ExecuteScalarAsync<long>();
-//                    maxId++;
-//
-//                    // INSERT EXAMPLE
-//                    cmd = connection.CreateInsertCommand("Books", new SpannerParameterCollection {
-//                        {"ID", SpannerDbType.Int64},
-//                        {"Author", SpannerDbType.String},
-//                        {"ISBN", SpannerDbType.String},
-//                        {"Name", SpannerDbType.String},
-//                        {"PublishDate", SpannerDbType.Date},
-//                    });
-//
-//                    button1.Text = $@"writing {i}";
-//
-//                    cmd.Parameters["ID"].Value = maxId;
-//                    cmd.Parameters["Author"].Value = "Phil Fritzche";
-//                    cmd.Parameters["ISBN"].Value = "12345678";
-//                    cmd.Parameters["Name"].Value = $"Testing Spanner using Examples #{maxId}";
-//                    cmd.Parameters["PublishDate"].Value = DateTime.Today;
-//                    rowsAffected = await cmd.ExecuteNonQueryAsync();
-//                    Debug.WriteLine($"{rowsAffected} Rows affected.");
-//                }
-//
-//                // UPDATE EXAMPLE
-//                cmd = connection.CreateUpdateCommand("Books", new SpannerParameterCollection {
-//                    {"ID", SpannerDbType.Int64 },
-//                    {"Author", SpannerDbType.String },
-//                    {"ISBN", SpannerDbType.String },
-//                    {"Name", SpannerDbType.String },
-//                    {"PublishDate", SpannerDbType.Date },
-//                });
-//
-//                cmd.Parameters["ID"].Value = maxId;
-//                cmd.Parameters["Author"].Value = "Phil Fritzche";
-//                cmd.Parameters["ISBN"].Value = "12345678";
-//                cmd.Parameters["Name"].Value = $"Testing Spanner using Examples. {maxId} Edition";
-//                cmd.Parameters["PublishDate"].Value = DateTime.Today;
-//                rowsAffected = await cmd.ExecuteNonQueryAsync();
-//                Debug.WriteLine($"{rowsAffected} Rows affected.");
+                long maxId = 0;
+                int rowsAffected = 0;
+
+                for (int i = 0; i < 2; i++)
+                {
+                    //QUERY SCALAR
+                    cmd = connection.CreateSelectCommand("SELECT MAX(ID) FROM Books");
+                    maxId = await cmd.ExecuteScalarAsync<long>();
+                    maxId++;
+
+                    // INSERT EXAMPLE
+                    cmd = connection.CreateInsertCommand("Books", new SpannerParameterCollection {
+                        {"ID", SpannerDbType.Int64},
+                        {"Author", SpannerDbType.String},
+                        {"ISBN", SpannerDbType.String},
+                        {"Name", SpannerDbType.String},
+                        {"PublishDate", SpannerDbType.Date},
+                    });
+
+                    button1.Text = $@"writing {i}";
+
+                    cmd.Parameters["ID"].Value = maxId;
+                    cmd.Parameters["Author"].Value = "Phil Fritzche";
+                    cmd.Parameters["ISBN"].Value = "12345678";
+                    cmd.Parameters["Name"].Value = $"Testing Spanner using Examples #{maxId}";
+                    cmd.Parameters["PublishDate"].Value = DateTime.Today;
+                    rowsAffected = await cmd.ExecuteNonQueryAsync();
+                    Debug.WriteLine($"{rowsAffected} Rows affected.");
+                }
+
+                // UPDATE EXAMPLE
+                cmd = connection.CreateUpdateCommand("Books", new SpannerParameterCollection {
+                    {"ID", SpannerDbType.Int64 },
+                    {"Author", SpannerDbType.String },
+                    {"ISBN", SpannerDbType.String },
+                    {"Name", SpannerDbType.String },
+                    {"PublishDate", SpannerDbType.Date },
+                });
+
+                cmd.Parameters["ID"].Value = maxId;
+                cmd.Parameters["Author"].Value = "Phil Fritzche";
+                cmd.Parameters["ISBN"].Value = "12345678";
+                cmd.Parameters["Name"].Value = $"Testing Spanner using Examples. {maxId} Edition";
+                cmd.Parameters["PublishDate"].Value = DateTime.Today;
+                rowsAffected = await cmd.ExecuteNonQueryAsync();
+                Debug.WriteLine($"{rowsAffected} Rows affected.");
             }
 
             button1.Text = @"GO!";

@@ -35,7 +35,7 @@ namespace Google.Cloud.Spanner.V1
             var info = s_sessionInfoTable.GetOrAdd(session, s => new SessionInfo {SpannerClient = client});
         
             //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
-            await info.WaitForPreWarm();
+            await info.WaitForPreWarm().ConfigureAwait(false);
             
             //now we see if we can return the prewarmed transaction.
             // a lot has to be correct for us to return the precreated transaction.
@@ -71,9 +71,9 @@ namespace Google.Cloud.Spanner.V1
         /// </summary>
         /// <param name="session"></param>
         /// <returns></returns>
-        public static async Task SetImplicitTransactionAsync(this Session session)
+        public static Task SetImplicitTransactionAsync(this Session session)
         {
-            await RemoveFromTransactionPool(session);
+            return RemoveFromTransactionPool(session);
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace Google.Cloud.Spanner.V1
             if (s_sessionInfoTable.TryGetValue(session, out info))
             {
                 //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
-                await info.WaitForPreWarm();
+                await info.WaitForPreWarm().ConfigureAwait(false);
                 if (info.ActiveTransaction != null && !info.ActiveTransaction.Id.IsEmpty)
                 {
                     Session ignored;
@@ -120,11 +120,11 @@ namespace Google.Cloud.Spanner.V1
         /// </summary>
         /// <param name="session"></param>
         /// <param name="client"></param>
-        public static async Task PreWarmTransactionAsync(this SpannerClient client, Session session)
+        public static Task PreWarmTransactionAsync(this SpannerClient client, Session session)
         {
             TransactionOptions options = session.GetLastUsedTransactionOptions();
             var info = s_sessionInfoTable.GetOrAdd(session, s => new SessionInfo {SpannerClient = client});
-            await info.PreWarmAsync(session, options);
+            return info.PreWarmAsync(session, options);
         }
 
         /// <summary>
@@ -134,9 +134,9 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="session"></param>
         /// <param name="mutations"></param>
         /// <returns></returns>
-        public static async Task CommitAsync(this Transaction transaction, Session session, IEnumerable<Mutation> mutations)
+        public static Task CommitAsync(this Transaction transaction, Session session, IEnumerable<Mutation> mutations)
         {
-            await RunFinalMethodAsync(transaction, session,
+            return RunFinalMethodAsync(transaction, session,
                 info => info.SpannerClient.CommitAsync(session.SessionName, info.ActiveTransaction.Id, mutations));
         }
 
@@ -146,9 +146,9 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="transaction"></param>
         /// <param name="session"></param>
         /// <returns></returns>
-        public static async Task RollbackAsync(this Transaction transaction, Session session)
+        public static Task RollbackAsync(this Transaction transaction, Session session)
         {
-            await RunFinalMethodAsync(transaction, session,
+            return RunFinalMethodAsync(transaction, session,
                 info => info.SpannerClient.RollbackAsync(session.SessionName, info.ActiveTransaction.Id));
         }
 
@@ -158,7 +158,7 @@ namespace Google.Cloud.Spanner.V1
             if (s_sessionInfoTable.TryGetValue(session, out info))
             {
                 //we should have already waited, but extra checking cannot hurt.
-                await info.WaitForPreWarm();
+                await info.WaitForPreWarm().ConfigureAwait(false);
                 if (info.ActiveTransaction == null
                     || info.ActiveTransaction.Id.IsEmpty
                     || !Equals(info.ActiveTransaction.Id, transaction.Id))
@@ -199,7 +199,7 @@ namespace Google.Cloud.Spanner.V1
                     Task prewarmTask = PreWarmTask;
                     if (prewarmTask != null && !prewarmTask.IsCompleted)
                     {
-                        await prewarmTask;
+                        await prewarmTask.ConfigureAwait(false);
                     }
                     PreWarmTask = null;
                 }
@@ -211,9 +211,9 @@ namespace Google.Cloud.Spanner.V1
 
             public async Task CreateTransactionAsync(Session session, TransactionOptions options)
             {
-                await WaitForPreWarm();  //this is a little redundant, but just to be sure.
+                await WaitForPreWarm().ConfigureAwait(false);  //this is a little redundant, but just to be sure.
                 ActiveTransactionOptions = options;
-                await CreateTransactionImplAsync(session);
+                await CreateTransactionImplAsync(session).ConfigureAwait(false);
             }
 
             private async Task CreateTransactionImplAsync(Session session)
@@ -222,7 +222,7 @@ namespace Google.Cloud.Spanner.V1
                 {
                     SessionAsSessionName = session.SessionName,
                     Options = ActiveTransactionOptions
-                });
+                }).ConfigureAwait(false);
                 s_activeTransactionTable.AddOrUpdate(ActiveTransaction.Id, session, (id, s) => session);
             }
 
@@ -230,14 +230,13 @@ namespace Google.Cloud.Spanner.V1
             {
                 //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
                 //this is a little redundant, but just to be sure.
-                await WaitForPreWarm();
+                await WaitForPreWarm().ConfigureAwait(false);
                 // for now, we only prewarm readwrite transactions because the read transaction semantics are usually
                 // dependent on the time the transaction begins.
                 if (options!= null && options.ModeCase == TransactionOptions.ModeOneofCase.ReadWrite)
                 {
                     ActiveTransactionOptions = options;
-                    PreWarmTask = CreateTransactionImplAsync(session);
-                    PreWarmTask.Start();
+                    PreWarmTask = Task.Run(() => CreateTransactionImplAsync(session));
                 }
             }
         }

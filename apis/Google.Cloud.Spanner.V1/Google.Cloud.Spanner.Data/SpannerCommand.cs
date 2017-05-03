@@ -227,7 +227,7 @@ namespace Google.Cloud.Spanner
             if (!SpannerConnection.IsOpen)
             {
                 //implicit open
-                await SpannerConnection.OpenAsync(cancellationToken);
+                await SpannerConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
             if (!SpannerConnection.IsOpen)
             {
@@ -235,7 +235,7 @@ namespace Google.Cloud.Spanner
             }
 
             // Execute the command.
-            var resultset = await SpannerTransactionImpl.ExecuteQueryAsync(CommandText, cancellationToken);
+            var resultset = await SpannerTransactionImpl.ExecuteQueryAsync(CommandText, cancellationToken).ConfigureAwait(false);
 
             if ((behavior & CommandBehavior.CloseConnection) == CommandBehavior.CloseConnection)
                 return new SpannerDataReader(resultset, SpannerConnection);
@@ -261,7 +261,7 @@ namespace Google.Cloud.Spanner
             if (!SpannerConnection.IsOpen)
             {
                 //implicit open
-                await SpannerConnection.OpenAsync(cancellationToken);
+                await SpannerConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
             if (!SpannerConnection.IsOpen)
             {
@@ -272,10 +272,10 @@ namespace Google.Cloud.Spanner
             List<Mutation> mutations = new List<Mutation>();
             if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Delete)
             {
-                for (int i = 0; i < 1000; i++)
-                {
+//                for (int i = 0; i < 1000; i++)
+//                {
                     var w = new Mutation.Types.Write {Table = SpannerCommandTextBuilder.TargetTable};
-                    Parameters["ID"].Value = (long) Parameters["ID"].Value + 1;
+                    //Parameters["ID"].Value = (long) Parameters["ID"].Value + 1;
                     w.Columns.AddRange(Parameters.Cast<SpannerParameter>()
                         .Select(x => x.SourceColumn ?? x.ParameterName));
                     w.Values.Add(new ListValue {
@@ -301,7 +301,7 @@ namespace Google.Cloud.Spanner
                         default:
                             throw new ArgumentOutOfRangeException();
                     }
-                }
+//                }
             }
             else
             {
@@ -324,7 +324,7 @@ namespace Google.Cloud.Spanner
             }
 
             // Make the request.  This will commit immediately or not depending on whether a transaction was explicitly created.
-            await SpannerTransactionImpl.ExecuteMutationsAsync(mutations, cancellationToken);
+            await SpannerTransactionImpl.ExecuteMutationsAsync(mutations, cancellationToken).ConfigureAwait(false);
 
             // Return the number of records affected.
             return mutations.Count;
@@ -335,9 +335,9 @@ namespace Google.Cloud.Spanner
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public async Task<T> ExecuteScalarAsync<T>()
+        public Task<T> ExecuteScalarAsync<T>()
         {
-            return await ExecuteScalarAsync<T>(CancellationToken.None);
+            return ExecuteScalarAsync<T>(CancellationToken.None);
         }
 
         /// <summary>
@@ -348,9 +348,9 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public async Task<T> ExecuteScalarAsync<T>(CancellationToken cancellationToken)
         {
-            using (var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken))
+            using (var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false))
             {
-                if (await reader.ReadAsync(cancellationToken) && reader.HasRows && reader.FieldCount > 0)
+                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false) && reader.HasRows && reader.FieldCount > 0)
                 {
                     return reader.GetFieldValue<T>(0);
                 }
@@ -361,9 +361,9 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override async Task<object> ExecuteScalarAsync(CancellationToken cancellationToken)
         {
-            using (var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken))
+            using (var reader = await ExecuteDbDataReaderAsync(CommandBehavior.SingleRow, cancellationToken).ConfigureAwait(false))
             {
-                if (await reader.ReadAsync(cancellationToken) && reader.HasRows && reader.FieldCount > 0)
+                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false) && reader.HasRows && reader.FieldCount > 0)
                 {
                     return reader[0];
                 }

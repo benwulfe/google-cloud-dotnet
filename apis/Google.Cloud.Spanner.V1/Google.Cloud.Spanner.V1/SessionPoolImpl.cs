@@ -28,14 +28,14 @@ namespace Google.Cloud.Spanner.V1
         }
 
 
-        internal async Task ReleaseAllImpl()
+        internal Task ReleaseAllImpl()
         {
             SessionPoolEntry[] entries;
             lock (_sessionMruStack)
             {
                 entries = _sessionMruStack.ToArray();
             }
-            await Task.WhenAll(entries.Select(sessionpoolentry => EvictImmediately(sessionpoolentry.Session, CancellationToken.None)).ToArray());
+            return Task.WhenAll(entries.Select(sessionpoolentry => EvictImmediately(sessionpoolentry.Session, CancellationToken.None)).ToArray());
         }
 
         private Task EvictSessionPoolEntry(Session session, CancellationToken cancellationToken)
@@ -62,7 +62,7 @@ namespace Google.Cloud.Spanner.V1
             }
             if (entry.Session != null)
             {
-                await Key.Client.DeleteSessionAsync(entry.Session.SessionName, cancellationToken);
+                await Key.Client.DeleteSessionAsync(entry.Session.SessionName, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -116,7 +116,7 @@ namespace Google.Cloud.Spanner.V1
             if (!TryPop(options, out sessionEntry))
             {
                 //create a new session, blocking or throwing if at the limit.
-                return await Key.Client.CreateSessionAsync(new DatabaseName(Key.Project, Key.Instance, Key.Database), cancellationToken);
+                return await Key.Client.CreateSessionAsync(new DatabaseName(Key.Project, Key.Instance, Key.Database), cancellationToken).ConfigureAwait(false);
             }
             MarkUsed();
             //note that the evict task will only actually delete the session if it was able to remove it from the pool.
@@ -161,7 +161,7 @@ namespace Google.Cloud.Spanner.V1
 
             if (SessionPool.UseTransactionWarming)
             {
-                client.PreWarmTransactionAsync(entry.Session).Start();
+                Task.Run(() => client.PreWarmTransactionAsync(entry.Session));
             }
             Push(entry);
             //kick off the pool eviction timer.  This gets canceled when the item is pulled from the pool.

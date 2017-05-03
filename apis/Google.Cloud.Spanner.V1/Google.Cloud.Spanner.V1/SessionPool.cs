@@ -80,7 +80,7 @@ namespace Google.Cloud.Spanner.V1
                 {
                     TaskCompletionSource<int> signal = new TaskCompletionSource<int>();
                     s_waitQueue.Enqueue(signal);
-                    await Task.WhenAny(signal.Task, canceledTask);
+                    await Task.WhenAny(signal.Task, canceledTask).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
                     lock (s_waitSync)
                     {
@@ -124,7 +124,7 @@ namespace Google.Cloud.Spanner.V1
             spannerInstance.ThrowIfNullOrEmpty(nameof(spannerInstance));
             spannerDatabase.ThrowIfNullOrEmpty(nameof(spannerDatabase));
             
-            await StartSessionCreating(cancellationToken);
+            await StartSessionCreating(cancellationToken).ConfigureAwait(false);
             try
             {
                 var sessionPoolKey = new SessionPoolKey {
@@ -198,7 +198,7 @@ namespace Google.Cloud.Spanner.V1
                 }
                 if (evictionSession != null)
                 {
-                    await evictionSession.RemoveFromTransactionPool();
+                    await evictionSession.RemoveFromTransactionPool().ConfigureAwait(false);
                     await evictionClient.DeleteSessionAsync(evictionSession.SessionName);
                 }
             }
@@ -217,7 +217,8 @@ namespace Google.Cloud.Spanner.V1
             if (s_sessionsInUse.TryRemove(session, out result))
             {
                 SignalAnyWaitingRequests();
-                await result.Client.DeleteSessionAsync(session.SessionName);
+                await result.Client.DeleteSessionAsync(session.SessionName).ConfigureAwait(false);
+                return;
             }
             throw new InvalidOperationException("ClosePooledSession was not able to locate the provided session.");
         }
@@ -238,11 +239,11 @@ namespace Google.Cloud.Spanner.V1
         /// Releases all pooled sessions and frees resources on the server.
         /// </summary>
         /// <returns></returns>
-        public static async Task ReleaseAll()
+        public static Task ReleaseAll()
         {
             var entries = GlobalPool.Values;
             GlobalPool.Clear(); // ReleaseAll should not be called while other operations are starting.
-            await Task.WhenAll(entries.Select(sessionpool => sessionpool.ReleaseAllImpl()).ToArray());
+            return Task.WhenAll(entries.Select(sessionpool => sessionpool.ReleaseAllImpl()).ToArray());
         }
 
         /// <summary>

@@ -59,7 +59,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            _connection.ReleaseSession(Session).Start();
+            Task.Run(() => _connection.ReleaseSession(Session));
         }
 
         /// <inheritdoc />
@@ -72,10 +72,10 @@ namespace Google.Cloud.Spanner
         /// 
         /// </summary>
         /// <returns></returns>
-        public async Task CommitAsync()
+        public Task CommitAsync()
         {
             Mode.Precondition(x => x != TransactionMode.ReadOnly, "You cannot commit a readonly transaction.");
-            await _transaction.CommitAsync(Session, Mutations);
+            return _transaction.CommitAsync(Session, Mutations);
         }
 
         internal IEnumerable<Mutation> Mutations => _mutations;
@@ -90,10 +90,10 @@ namespace Google.Cloud.Spanner
         /// 
         /// </summary>
         /// <returns></returns>
-        public async Task RollbackAsync()
+        public Task RollbackAsync()
         {
             Mode.Precondition(x => x == TransactionMode.ReadOnly, "You cannot roll back a readonly transaction.");
-            await _transaction.RollbackAsync(Session);
+            return _transaction.RollbackAsync(Session);
         }
 
         private void CheckCompatibleMode(TransactionMode mode)

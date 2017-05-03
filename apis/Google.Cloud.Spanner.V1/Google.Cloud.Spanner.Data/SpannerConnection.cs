@@ -148,17 +148,17 @@ namespace Google.Cloud.Spanner
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public async Task<SpannerTransaction> BeginReadOnlyTransactionAsync(
+        public Task<SpannerTransaction> BeginReadOnlyTransactionAsync(
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await BeginReadOnlyTransactionAsync(new TransactionOptions.Types.ReadOnly { Strong = true}, cancellationToken);
+            return BeginReadOnlyTransactionAsync(new TransactionOptions.Types.ReadOnly { Strong = true}, cancellationToken);
         }
 
         private async Task<SpannerTransaction> BeginTransactionImpl(CancellationToken cancellationToken, TransactionOptions transactionOptions, TransactionMode transactionMode)
         {
-            using (var sessionHolder = await SessionHolder.Allocate(this, transactionOptions, cancellationToken))
+            using (var sessionHolder = await SessionHolder.Allocate(this, transactionOptions, cancellationToken).ConfigureAwait(false))
             {
-                var transaction = await SpannerClient.BeginPooledTransactionAsync(sessionHolder.Session, transactionOptions);
+                var transaction = await SpannerClient.BeginPooledTransactionAsync(sessionHolder.Session, transactionOptions).ConfigureAwait(false);
                 return new SpannerTransaction(this, transactionMode, sessionHolder.TakeOwnership(),
                     transaction);
             }
@@ -210,7 +210,7 @@ namespace Google.Cloud.Spanner
                 session = _sharedSession;
                 _sharedSession = null;
             }
-            if (!primarySessionInUse)
+            if (session != null && !primarySessionInUse)
             {
                 //release the session if its not used.
                 //if it's used, we'll detect a closed state after the operation and release it then.
@@ -305,13 +305,13 @@ namespace Google.Cloud.Spanner
             try
             {
                 _client = await ClientPool.AcquireClientAsync(_connectionStringBuilder.Credential,
-                    _connectionStringBuilder.EndPoint);
+                    _connectionStringBuilder.EndPoint).ConfigureAwait(false);
                 _sharedSession = await SpannerClient.CreateSessionFromPoolAsync(
                     _connectionStringBuilder.Project,
                     _connectionStringBuilder.SpannerInstance,
                     _connectionStringBuilder.SpannerDatabase,
                     s_defaultTransactionOptions,
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
                 _sessionRefCount = 0;
             }
             finally
@@ -366,7 +366,7 @@ namespace Google.Cloud.Spanner
             }
             else
             {
-                await SpannerClient.ReleaseToPool(session);
+                await SpannerClient.ReleaseToPool(session).ConfigureAwait(false);
             }
         }
 
@@ -483,7 +483,7 @@ namespace Google.Cloud.Spanner
 
             public static async Task<SessionHolder> Allocate(SpannerConnection owner, TransactionOptions options, CancellationToken cancellationToken)
             {
-                var session = await owner.AllocateSession(options, cancellationToken);
+                var session = await owner.AllocateSession(options, cancellationToken).ConfigureAwait(false);
                 return new SessionHolder(owner, session);
             }
 
@@ -498,7 +498,7 @@ namespace Google.Cloud.Spanner
                 var session = Interlocked.Exchange(ref _session, null);
                 if (session != null)
                 {
-                    _connection.ReleaseSession(session).Start();
+                    Task.Run(() => _connection.ReleaseSession(session));
                 }
             }
         }

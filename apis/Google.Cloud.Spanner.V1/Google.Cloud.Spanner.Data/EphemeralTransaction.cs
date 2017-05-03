@@ -30,26 +30,26 @@ namespace Google.Cloud.Spanner
         public async Task<int> ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
         {
             int count;
-            using (var transaction =  await _connection.BeginTransactionAsync(cancellationToken))
+            using (var transaction =  await _connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
             {
-                count = await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken);
-                await transaction.CommitAsync();
+                count = await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken).ConfigureAwait(false);
+                await transaction.CommitAsync().ConfigureAwait(false);
             }
             return count;
         }
 
         public async Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
         {
-            using (SpannerConnection.SessionHolder holder = await SpannerConnection.SessionHolder.Allocate(_connection, cancellationToken))
+            using (SpannerConnection.SessionHolder holder = await SpannerConnection.SessionHolder.Allocate(_connection, cancellationToken).ConfigureAwait(false))
             {
                 var streamReader = _connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest
                 {
                     Sql = sql,
                 }, holder.TakeOwnership());
 
-                streamReader.StreamClosed += (o, e) =>
+                streamReader.StreamClosed += async (o, e) =>
                 {
-                    _connection.ReleaseSession(streamReader.Session).Start();
+                    await _connection.ReleaseSession(streamReader.Session).ConfigureAwait(false);
                 };
 
                 return streamReader;

@@ -151,7 +151,7 @@ namespace Google.Cloud.Spanner
                                 },
                                 SpannerClient.DefaultScopes,
                                 "user",
-                                CancellationToken.None);
+                                CancellationToken.None).ConfigureAwait(false);
             }
             return null;
         }
