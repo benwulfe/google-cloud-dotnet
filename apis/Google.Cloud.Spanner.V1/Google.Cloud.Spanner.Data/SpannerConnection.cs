@@ -200,13 +200,7 @@ namespace Google.Cloud.Spanner
             if (session != null && !primarySessionInUse)
             {
                 //release the session if its not used.
-                //if it's used, we'll detect a closed state after the operation and release it then.
-                var task = SpannerClient.ReleaseToPool(session);
-                task.ContinueWith(t =>
-                {
-                    //TODO, proper logging.
-                    //if (t.IsFaulted && t.Exception != null) Trace.TraceWarning($"Error releasing session: {t.Exception}");
-                });
+                SpannerClient.ReleaseToPool(session);
             }
         }
 
@@ -345,7 +339,7 @@ namespace Google.Cloud.Spanner
         }
 
 
-        internal async Task ReleaseSession(Session session)
+        internal void ReleaseSession(Session session)
         {
             if (ReferenceEquals(session, _sharedSession))
             {
@@ -353,7 +347,7 @@ namespace Google.Cloud.Spanner
             }
             else
             {
-                await SpannerClient.ReleaseToPool(session).ConfigureAwait(false);
+                SpannerClient.ReleaseToPool(session);
             }
         }
 
@@ -485,7 +479,7 @@ namespace Google.Cloud.Spanner
                 var session = Interlocked.Exchange(ref _session, null);
                 if (session != null)
                 {
-                    Task.Run(() => _connection.ReleaseSession(session));
+                    _connection.ReleaseSession(session);
                 }
             }
         }

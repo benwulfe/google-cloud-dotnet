@@ -9,7 +9,7 @@ namespace Google.Cloud.Spanner.V1.Logging
 {
     internal class DefaultLogger : Logger
     {
-        private const int PerformanceLogInterval = 30000;
+        private const int PerformanceLogInterval = 10000;
         private int _perfLoggingTaskEnabled;
         private readonly ConcurrentDictionary<string, PerformanceTimeEntry> _perfCounterDictionary = new ConcurrentDictionary<string, PerformanceTimeEntry>();
 
@@ -59,7 +59,22 @@ namespace Google.Cloud.Spanner.V1.Logging
                 message.AppendLine("Spanner performance metrics:");
                 foreach (var kvp in _perfCounterDictionary)
                 {
-                    message.AppendLine($" {kvp.Key}  #={kvp.Value.Instances} avg={kvp.Value.Average} max={kvp.Value.Maximum} min={kvp.Value.Minimum} last={kvp.Value.Last}");
+                    //to make the tavg correct, we re-record the last value at the current timestamp.
+                    RecordEntryValue(kvp.Value, () => kvp.Value.Last );
+
+                    //log it.
+                    message.AppendLine($" {kvp.Key}  #={kvp.Value.Instances} tavg={kvp.Value.TimeWeightedAverage} avg={kvp.Value.Average} max={kvp.Value.Maximum} min={kvp.Value.Minimum} last={kvp.Value.Last}");
+                    
+                    //now reset to last.
+                    lock (kvp.Value)
+                    {
+                        kvp.Value.TotalTime = default(TimeSpan);
+                        kvp.Value.LastMeasureTime = DateTime.UtcNow;
+                        kvp.Value.Maximum = kvp.Value.Last;
+                        kvp.Value.Minimum = kvp.Value.Last;
+                        kvp.Value.Average = kvp.Value.Last;
+                        kvp.Value.TimeWeightedAverage = kvp.Value.Last;
+                    }
                 }
 
 #if NET45 || NET451
@@ -71,6 +86,31 @@ namespace Google.Cloud.Spanner.V1.Logging
             // ReSharper disable once FunctionNeverReturns
         }
 
+        private void RecordEntryValue(PerformanceTimeEntry entry, Func<double> valueFunc)
+        {
+            lock (entry)
+            {
+                var value = valueFunc();
+                double total = entry.Instances * entry.Average;
+                entry.Instances++;
+                entry.Average = (total + value) / entry.Instances;
+                entry.Maximum = Math.Max(entry.Maximum, value);
+                entry.Minimum = Math.Min(entry.Minimum, value);
+                var now = DateTime.UtcNow;
+                if (entry.LastMeasureTime != default(DateTime))
+                {
+                    double milliSoFar = 0;
+                    var deltaTime = (now - entry.LastMeasureTime).TotalMilliseconds;
+                    milliSoFar += entry.TotalTime.TotalMilliseconds;
+                    entry.TotalTime = entry.TotalTime.Add(TimeSpan.FromMilliseconds(deltaTime));
+                    entry.TimeWeightedAverage = (milliSoFar * entry.TimeWeightedAverage + entry.Last * deltaTime) /
+                                                entry.TotalTime.TotalMilliseconds;
+                }
+                entry.LastMeasureTime = now;
+                entry.Last = value;
+            }
+        }
+
         public override void LogPerformanceCounter(string name, double value)
         {
             if (Interlocked.CompareExchange(ref _perfLoggingTaskEnabled, 1, 0) == 0)
@@ -79,26 +119,19 @@ namespace Google.Cloud.Spanner.V1.Logging
                 Task.Run(PerformanceLogAsync);
             }
 
-            var entry = _perfCounterDictionary.GetOrAdd(name, n => new PerformanceTimeEntry());
-
-            lock (entry)
-            {
-                double total = entry.Instances * entry.Average;
-                entry.Instances++;
-                entry.Average = (total + value) / entry.Instances;
-                entry.Maximum = Math.Max(entry.Maximum, value);
-                entry.Minimum = Math.Min(entry.Minimum, value);
-                entry.Last = value;
-            }
+            RecordEntryValue(_perfCounterDictionary.GetOrAdd(name, n => new PerformanceTimeEntry()), () => value);
         }
 
         class PerformanceTimeEntry
         {
             public int Instances { get; set; }
             public double Average { get; set; }
+            public double TimeWeightedAverage { get; set; }
+            public TimeSpan TotalTime { get; set; }
             public double Maximum { get; set; }
             public double Minimum { get; set; }
             public double Last { get; set; }
+            public DateTime LastMeasureTime { get; set; }
         }
     }
 }

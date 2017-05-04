@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Google.Cloud.Spanner;
 
@@ -46,7 +47,7 @@ namespace WindowsFormsApplication1
                 //}
 
                 long maxId = 0;
-                int rowsAffected = 0;
+                int rowsAffected;
 
                 for (int i = 0; i < 2; i++)
                 {

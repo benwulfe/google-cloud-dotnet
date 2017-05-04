@@ -176,7 +176,7 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="session"></param>
         /// <param name="client"></param>
         /// <returns></returns>
-        public static async Task ReleaseToPool(this SpannerClient client, Session session )
+        public static void ReleaseToPool(this SpannerClient client, Session session )
         {
             session.ThrowIfNull(nameof(session));
 
@@ -206,10 +206,15 @@ namespace Google.Cloud.Spanner.V1
                 }
                 if (evictionSession != null)
                 {
-                    await evictionSession.RemoveFromTransactionPool().ConfigureAwait(false);
-                    await evictionClient.DeleteSessionAsync(evictionSession.SessionName);
+                    Task.Run(() => EvictSession(evictionClient, evictionSession));
                 }
             }
+        }
+
+        private static async Task EvictSession(SpannerClient evictionClient, Session evictionSession)
+        {
+            await evictionSession.RemoveFromTransactionPool().ConfigureAwait(false);
+            await evictionClient.DeleteSessionAsync(evictionSession.SessionName);
         }
 
         /// <summary>

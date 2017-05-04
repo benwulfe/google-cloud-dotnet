@@ -59,7 +59,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            Task.Run(() => _connection.ReleaseSession(Session));
+            _connection.ReleaseSession(Session);
         }
 
         /// <inheritdoc />

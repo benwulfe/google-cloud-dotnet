@@ -47,9 +47,9 @@ namespace Google.Cloud.Spanner
                     Sql = sql,
                 }, holder.TakeOwnership());
 
-                streamReader.StreamClosed += async (o, e) =>
+                streamReader.StreamClosed += (o, e) =>
                 {
-                    await _connection.ReleaseSession(streamReader.Session).ConfigureAwait(false);
+                    _connection.ReleaseSession(streamReader.Session);
                 };
 
                 return streamReader;
