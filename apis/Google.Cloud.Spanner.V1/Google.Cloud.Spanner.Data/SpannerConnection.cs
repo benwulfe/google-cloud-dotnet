@@ -378,13 +378,34 @@ namespace Google.Cloud.Spanner
 
         internal void ReleaseSession(Session session)
         {
-            if (ReferenceEquals(session, _sharedSession))
+            Session sessionToRelease = null;
+            lock (_sync)
             {
-                Interlocked.Decrement(ref _sessionRefCount);
+                if (ReferenceEquals(session, _sharedSession))
+                {
+                    Interlocked.Decrement(ref _sessionRefCount);
+                    if (!IsOpen && _sessionRefCount == 0)
+                    {
+                        //delayed session release due to a synchronous close
+                        sessionToRelease = _sharedSession;
+                        _sharedSession = null;
+                    }
+                }
+                else if (_sharedSession == null && IsOpen)
+                {
+                    //someone stole the shared session, lets put it back for reserved use.
+                    _sharedSession = session;
+                    //we'll also ensure the refcnt is zero, but this should already be true.
+                    _sessionRefCount = 0;
+                }
+                else
+                {
+                    sessionToRelease = session;
+                }
             }
-            else
+            if (sessionToRelease != null)
             {
-                SpannerClient.ReleaseToPool(session);
+                SpannerClient.ReleaseToPool(sessionToRelease);
             }
         }
 
