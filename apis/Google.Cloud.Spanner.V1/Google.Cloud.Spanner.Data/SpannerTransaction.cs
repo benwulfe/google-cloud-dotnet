@@ -19,6 +19,7 @@ using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Cloud.Spanner.V1;
+using Google.Cloud.Spanner.V1.Logging;
 
 // ReSharper disable UnusedParameter.Local
 
@@ -31,9 +32,16 @@ namespace Google.Cloud.Spanner
         private readonly SpannerConnection _connection;
         private readonly Transaction _transaction;
         private readonly List<Mutation> _mutations = new List<Mutation>();
+        private static long s_transactionCount;
 
         internal SpannerTransaction(SpannerConnection connection, TransactionMode mode, Session session, Transaction transaction) 
         {
+            connection.AssertNotNull(nameof(connection));
+            session.AssertNotNull(nameof(session));
+            transaction.AssertNotNull(nameof(transaction));
+
+            Logger.LogPerformanceCounter("Transactions.ActiveCount", () => Interlocked.Increment(ref s_transactionCount));
+
             Session = session;
             _transaction = transaction;
             _connection = connection;
@@ -59,6 +67,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
+            Logger.LogPerformanceCounter("Transactions.ActiveCount", () => Interlocked.Decrement(ref s_transactionCount));
             _connection.ReleaseSession(Session);
         }
 
@@ -74,8 +83,11 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public Task CommitAsync()
         {
-            Mode.Precondition(x => x != TransactionMode.ReadOnly, "You cannot commit a readonly transaction.");
-            return _transaction.CommitAsync(Session, Mutations);
+            return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
+            {
+                Mode.AssertTrue(x => x != TransactionMode.ReadOnly, "You cannot commit a readonly transaction.");
+                return _transaction.CommitAsync(Session, Mutations);
+            }, "SpannerTransaction.Commit");
         }
 
         internal IEnumerable<Mutation> Mutations => _mutations;
@@ -92,8 +104,11 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public Task RollbackAsync()
         {
-            Mode.Precondition(x => x == TransactionMode.ReadOnly, "You cannot roll back a readonly transaction.");
-            return _transaction.RollbackAsync(Session);
+            return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
+            {
+                Mode.AssertTrue(x => x == TransactionMode.ReadOnly, "You cannot roll back a readonly transaction.");
+                return _transaction.RollbackAsync(Session);
+            }, "SpannerTransaction.Rollback");
         }
 
         private void CheckCompatibleMode(TransactionMode mode)
@@ -101,11 +116,11 @@ namespace Google.Cloud.Spanner
             switch (mode)
             {
                 case TransactionMode.ReadOnly:
-                    Mode.Precondition(x => x == TransactionMode.ReadOnly || x == TransactionMode.ReadWrite,
+                    Mode.AssertTrue(x => x == TransactionMode.ReadOnly || x == TransactionMode.ReadWrite,
                         "You can only execute reads on a ReadWrite or ReadOnly Transaction!");
                     break;
                 case TransactionMode.ReadWrite:
-                    Mode.Precondition(x => x == TransactionMode.ReadWrite,
+                    Mode.AssertTrue(x => x == TransactionMode.ReadWrite,
                         "You can only execute read/write commands on a ReadWrite Transaction!");
                     break;
                 default:
@@ -116,12 +131,13 @@ namespace Google.Cloud.Spanner
         private TransactionSelector GetTransactionSelector(TransactionMode mode)
         {
             CheckCompatibleMode(mode);
-            _transaction.Precondition(x => x != null, "Transaction should have been created prior to use.");
+            _transaction.AssertTrue(x => x != null, "Transaction should have been created prior to use.");
             return new TransactionSelector { Id = _transaction?.Id };
         }
 
         Task<int> ISpannerTransaction.ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
         {
+            mutations.AssertNotNull(nameof(mutations));
             CheckCompatibleMode(TransactionMode.ReadWrite);
 
             TaskCompletionSource<int> taskCompletionSource = new TaskCompletionSource<int>();
@@ -133,13 +149,18 @@ namespace Google.Cloud.Spanner
 
         Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
         {
-            TaskCompletionSource<ReliableStreamReader> taskCompletionSource = new TaskCompletionSource<ReliableStreamReader>();
-            taskCompletionSource.SetResult(_connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest {
-                Sql = sql,
-                Transaction = GetTransactionSelector(TransactionMode.ReadOnly)
-            }, Session));
+            sql.AssertNotNullOrEmpty(nameof(sql));
+            return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
+            {
+                TaskCompletionSource<ReliableStreamReader> taskCompletionSource =
+                    new TaskCompletionSource<ReliableStreamReader>();
+                taskCompletionSource.SetResult(_connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest {
+                    Sql = sql,
+                    Transaction = GetTransactionSelector(TransactionMode.ReadOnly)
+                }, Session));
 
-            return taskCompletionSource.Task;
+                return taskCompletionSource.Task;
+            }, "SpannerTransaction.ExecuteQuery");
         }
     }
 }

@@ -22,31 +22,7 @@ namespace Google.Cloud.Spanner
     {
         /// <summary>
         /// </summary>
-        public TimestampBoundMode Mode
-        {
-            get { throw new NotImplementedException(); }
-        }
-
-        /// <summary>
-        /// </summary>
-        public TimeSpan Staleness
-        {
-            get { throw new NotImplementedException(); }
-        }
-
-        /// <summary>
-        /// </summary>
-        public static TimestampBound Strong
-        {
-            get { throw new NotImplementedException(); }
-        }
-
-        /// <summary>
-        /// </summary>
-        public DateTime TimeStamp
-        {
-            get { throw new NotImplementedException(); }
-        }
+        public static TimestampBound Strong { get; } = new TimestampBound {Mode = TimestampBoundMode.Strong};
 
         /// <summary>
         /// </summary>
@@ -54,7 +30,10 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static TimestampBound OfExactStaleness(TimeSpan duration)
         {
-            throw new NotImplementedException();
+            return new TimestampBound {
+                Mode = TimestampBoundMode.ExactStaleness,
+                Staleness = duration
+            };
         }
 
         /// <summary>
@@ -63,7 +42,11 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static TimestampBound OfMaxStaleness(TimeSpan duration)
         {
-            throw new NotImplementedException();
+            return new TimestampBound
+            {
+                Mode = TimestampBoundMode.MaxStaleness,
+                Staleness = duration
+            };
         }
 
         /// <summary>
@@ -72,7 +55,11 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static TimestampBound OfMinReadTimestamp(DateTime timestamp)
         {
-            throw new NotImplementedException();
+            return new TimestampBound
+            {
+                Mode = TimestampBoundMode.MinReadTimestamp,
+                TimeStamp = timestamp
+            };
         }
 
         /// <summary>
@@ -81,7 +68,23 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static TimestampBound OfReadTimestamp(DateTime timestamp)
         {
-            throw new NotImplementedException();
+            return new TimestampBound
+            {
+                Mode = TimestampBoundMode.ReadTimestamp,
+                TimeStamp = timestamp
+            };
         }
+
+        /// <summary>
+        /// </summary>
+        public TimestampBoundMode Mode { get; internal set; }
+
+        /// <summary>
+        /// </summary>
+        public TimeSpan Staleness { get; internal set; }
+
+        /// <summary>
+        /// </summary>
+        public DateTime TimeStamp { get; internal set; }
     }
 }

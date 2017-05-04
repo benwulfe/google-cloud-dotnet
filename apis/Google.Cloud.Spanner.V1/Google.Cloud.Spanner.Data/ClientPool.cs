@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Google.Api.Gax.Grpc;
 using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Spanner.V1;
+using Google.Cloud.Spanner.V1.Logging;
 using Grpc.Auth;
 
 namespace Google.Cloud.Spanner
@@ -26,7 +27,9 @@ namespace Google.Cloud.Spanner
                 Endpoint = endpoint ?? SpannerClient.DefaultEndpoint
             };
             ClientPoolEntry poolEntry = s_clientEntryPool.GetOrAdd(key, k => new ClientPoolEntry(key));
-            return await poolEntry.AcquireClientFromEntryAsync().ConfigureAwait(false);
+            var result = await poolEntry.AcquireClientFromEntryAsync().ConfigureAwait(false);
+            Logger.LogPerformanceCounter("SpannerClient.Count", () => s_clientEntryPool.Count);
+            return result;
         }
 
         public static int Timeout { get; set; }
@@ -38,6 +41,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static async Task CloseAllAsync()
         {
+            Logger.Debug(() => "Shutting down all gRPC channels.");
             await SpannerClient.ShutdownDefaultChannelsAsync().ConfigureAwait(false);
             s_clientEntryPool.Clear();
         }
@@ -62,6 +66,7 @@ namespace Google.Cloud.Spanner
             {
                 if (_client == null)
                 {
+                    Logger.Debug(() => "Creating a new SpannerClient.");
                     if (_key.Credential != null && _key.Credential != ApplicationDefault.Instance)
                     {
                         //TODO use a custom channel with specified credentials instead of the pool.

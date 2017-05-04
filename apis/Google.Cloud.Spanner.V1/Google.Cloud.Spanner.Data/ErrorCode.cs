@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Grpc.Core;
+
 namespace Google.Cloud.Spanner
 {
     /// <summary>
@@ -20,66 +22,66 @@ namespace Google.Cloud.Spanner
     {
         /// <summary>
         /// </summary>
-        Cancelled,
+        Cancelled = StatusCode.Cancelled,
 
         /// <summary>
         /// </summary>
-        Unknown,
+        Unknown = StatusCode.Unknown,
 
         /// <summary>
         /// </summary>
-        InvalidArgument,
+        InvalidArgument = StatusCode.InvalidArgument,
 
         /// <summary>
         /// </summary>
-        DeadlineExceeded,
+        DeadlineExceeded = StatusCode.DeadlineExceeded,
 
         /// <summary>
         /// </summary>
-        NotFound,
+        NotFound = StatusCode.NotFound,
 
         /// <summary>
         /// </summary>
-        AlreadyExists,
+        AlreadyExists = StatusCode.AlreadyExists,
 
         /// <summary>
         /// </summary>
-        PermissionDenied,
+        PermissionDenied = StatusCode.PermissionDenied,
 
         /// <summary>
         /// </summary>
-        Unauthenticated,
+        Unauthenticated = StatusCode.Unauthenticated,
 
         /// <summary>
         /// </summary>
-        ResourceExhausted,
+        ResourceExhausted = StatusCode.ResourceExhausted,
 
         /// <summary>
         /// </summary>
-        FailedPrecondition,
+        FailedPrecondition = StatusCode.FailedPrecondition,
 
         /// <summary>
         /// </summary>
-        Aborted,
+        Aborted = StatusCode.Aborted,
 
         /// <summary>
         /// </summary>
-        OutOfRange,
+        OutOfRange = StatusCode.OutOfRange,
 
         /// <summary>
         /// </summary>
-        Unimplemented,
+        Unimplemented = StatusCode.Unimplemented,
 
         /// <summary>
         /// </summary>
-        Internal,
+        Internal = StatusCode.Internal,
 
         /// <summary>
         /// </summary>
-        Unavailable,
+        Unavailable = StatusCode.Unavailable,
 
         /// <summary>
         /// </summary>
-        DataLoss
+        DataLoss = StatusCode.DataLoss
     }
 }

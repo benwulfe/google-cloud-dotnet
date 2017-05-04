@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Google.Api.Gax;
 using Google.Api.Gax.Grpc;
+using Google.Cloud.Spanner.V1.Logging;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
@@ -51,8 +52,10 @@ namespace Google.Cloud.Spanner.V1
 
         private async Task<Metadata> ConnectAsync()
         {
+            Logger.LogPerformanceCounterFn("StreamReader.ConnectCount", x => x + 1);
             if (_resumeToken != null)
             {
+                Logger.Debug(() => $"Resuming at location:{_resumeToken}");
                 _request.ResumeToken = _resumeToken;
             }
             _currentCall = _spannerClient.ExecuteSqlStream(_request);
@@ -97,16 +100,21 @@ namespace Google.Cloud.Spanner.V1
         {
             try
             {
+                Logger.LogPerformanceCounterFn("StreamReader.MoveNextCount", x => x + 1);
                 //we increment our skip count before calling MoveNext so that a reconnect operation
                 //will fast forward to the proper place.
                 _resumeSkipCount++;
                 _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception)  //todo log the exception.
+            catch (Exception e) 
             {
+                _currentCall = null;
+
                 //reconnect on failure which will call reliableconnect and respect resumetoken and resumeskip
                 cancellationToken.ThrowIfCancellationRequested();
-                _currentCall = null;
+
+                Logger.Warn(() => $"An error occurred attemping to iterate through the sql query.  Attempting to recover. Exception:{e}");
+
                 //when we reconnect, we purposely do not do a *reliable*movenext.  If we fail to fast forward on the reconnect
                 //we bail out completely and surface the error.
                 return await ReliableConnect(cancellationToken);

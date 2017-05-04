@@ -125,6 +125,15 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
+        /// 
+        /// </summary>
+        public int PerformanceTraceLogInterval
+        {
+            get { return V1.Logging.Logger.PerformanceTraceLogInterval; }
+            set { V1.Logging.Logger.PerformanceTraceLogInterval = value; }
+        }
+
+        /// <summary>
         /// </summary>
         public int TimeoutMilliseconds { get; set; } = 600000;
     }

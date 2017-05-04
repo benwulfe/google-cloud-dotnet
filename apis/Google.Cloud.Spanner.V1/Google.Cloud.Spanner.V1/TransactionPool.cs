@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Google.Cloud.Spanner.V1.Logging;
 using Google.Protobuf;
 
 namespace Google.Cloud.Spanner.V1
@@ -163,8 +164,7 @@ namespace Google.Cloud.Spanner.V1
                     || info.ActiveTransaction.Id.IsEmpty
                     || !Equals(info.ActiveTransaction.Id, transaction.Id))
                 {
-                    throw new InvalidOperationException(
-                        "The transaction being committed was not found to have a valid entry.");
+                    throw new InvalidOperationException("The transaction being committed was not found to have a valid entry.");
                 }
 
                 try
@@ -179,9 +179,10 @@ namespace Google.Cloud.Spanner.V1
             }
             else
             {
-                throw new InvalidOperationException("The given transaction was not found in the transaction pool. You"
-                                                    +
-                                                    " can only use this method on Transactions returned from TransactionPoool.CreateTransactionAsync.");
+                throw new ArgumentException(
+                    "The given transaction was not found in the transaction pool. Only "
+                    +
+                    "use this method on Transactions returned from TransactionPoool.CreateTransactionAsync.");
             }
         }
 
@@ -203,9 +204,9 @@ namespace Google.Cloud.Spanner.V1
                     }
                     PreWarmTask = null;
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    //todo: log the error
+                    Logger.Error(() => "An error occurred attemping to prewarm a session.", e);
                 }
             }
 
@@ -235,6 +236,7 @@ namespace Google.Cloud.Spanner.V1
                 // dependent on the time the transaction begins.
                 if (options!= null && options.ModeCase == TransactionOptions.ModeOneofCase.ReadWrite)
                 {
+                    Logger.Debug(() => $"Pre-warming session transaction state. Mode={options.ModeCase}");
                     ActiveTransactionOptions = options;
                     PreWarmTask = Task.Run(() => CreateTransactionImplAsync(session));
                 }

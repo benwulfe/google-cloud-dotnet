@@ -54,6 +54,9 @@ namespace Google.Cloud.Spanner
         public SpannerCommand(SpannerCommandTextBuilder commandTextBuilder, SpannerConnection connection,
             SpannerTransaction transaction = null, SpannerParameterCollection parameters = null)
         {
+            commandTextBuilder.AssertNotNull(nameof(commandTextBuilder));
+            connection.AssertNotNull(nameof(connection));
+
             SpannerCommandTextBuilder = commandTextBuilder;
             SpannerConnection = connection;
             _transaction = transaction;
@@ -90,7 +93,13 @@ namespace Google.Cloud.Spanner
         public override CommandType CommandType
         {
             get { return CommandType.Text; }
-            set { throw new NotSupportedException("Cloud Spanner only supports CommandType.Text."); }
+            set
+            {
+                if (!Equals(value, CommandType.Text))
+                {
+                    throw new NotSupportedException("Cloud Spanner only supports CommandType.Text.");
+                }
+            }
         }
 
         /// <inheritdoc />
@@ -200,7 +209,7 @@ namespace Google.Cloud.Spanner
                 case CommandBehavior.KeyInfo:
                 case CommandBehavior.SchemaOnly:
                 case CommandBehavior.SequentialAccess:
-                    throw new InvalidOperationException($"CommandBehavior {behavior} is not supported by Cloud Spanner.");
+                    throw new NotSupportedException($"CommandBehavior {behavior} is not supported by Cloud Spanner.");
             }
         }
 
@@ -222,7 +231,7 @@ namespace Google.Cloud.Spanner
             }
             if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Select)
             {
-                throw new InvalidOperationException("You can only call ExecuteReader on a Select or Read Command");
+                throw new InvalidOperationException("You can only call ExecuteReader on a Select Command");
             }
             if (!SpannerConnection.IsOpen)
             {
@@ -265,7 +274,7 @@ namespace Google.Cloud.Spanner
             }
             if (!SpannerConnection.IsOpen)
             {
-                throw new InvalidOperationException("Unable to open the Spanner connection to the database.");
+                throw new InvalidOperationException("Unable to open the Spanner connection to the database to execute the query.");
             }
 
             // Execute the command.

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
@@ -9,7 +10,6 @@ namespace Google.Cloud.Spanner.V1.Logging
 {
     internal class DefaultLogger : Logger
     {
-        private const int PerformanceLogInterval = 10000;
         private int _perfLoggingTaskEnabled;
         private readonly ConcurrentDictionary<string, PerformanceTimeEntry> _perfCounterDictionary = new ConcurrentDictionary<string, PerformanceTimeEntry>();
 
@@ -52,22 +52,30 @@ namespace Google.Cloud.Spanner.V1.Logging
         private async Task PerformanceLogAsync()
         {
             StringBuilder message = new StringBuilder();
+            SortedList metricList = new SortedList();
             while (true)
             {
                 message.Clear();
-                await Task.Delay(PerformanceLogInterval);
+                metricList.Clear();
+                await Task.Delay(PerformanceTraceLogInterval);
                 message.AppendLine("Spanner performance metrics:");
                 foreach (var kvp in _perfCounterDictionary)
                 {
                     //to make the tavg correct, we re-record the last value at the current timestamp.
-                    RecordEntryValue(kvp.Value, () => kvp.Value.Last );
+                    UpdateTimeWeightedAvg(kvp.Value, DateTime.UtcNow);
 
                     //log it.
-                    message.AppendLine($" {kvp.Key}  #={kvp.Value.Instances} tavg={kvp.Value.TimeWeightedAverage} avg={kvp.Value.Average} max={kvp.Value.Maximum} min={kvp.Value.Minimum} last={kvp.Value.Last}");
+                    metricList.Add(kvp.Key,
+                        $" {kvp.Key}({kvp.Value.Instances}) tavg={kvp.Value.TimeWeightedAverage} avg={kvp.Value.Average} max={kvp.Value.Maximum} min={kvp.Value.Minimum} last={kvp.Value.Last}");
                     
                     //now reset to last.
                     lock (kvp.Value)
                     {
+                        if (kvp.Value.ShouldReset)
+                        {
+                            kvp.Value.Last = 0;
+                        }
+                        kvp.Value.Instances = 0;
                         kvp.Value.TotalTime = default(TimeSpan);
                         kvp.Value.LastMeasureTime = DateTime.UtcNow;
                         kvp.Value.Maximum = kvp.Value.Last;
@@ -75,6 +83,11 @@ namespace Google.Cloud.Spanner.V1.Logging
                         kvp.Value.Average = kvp.Value.Last;
                         kvp.Value.TimeWeightedAverage = kvp.Value.Last;
                     }
+                }
+
+                foreach (string s in metricList.GetValueList())
+                {
+                    message.AppendLine(s);
                 }
 
 #if NET45 || NET451
@@ -86,17 +99,28 @@ namespace Google.Cloud.Spanner.V1.Logging
             // ReSharper disable once FunctionNeverReturns
         }
 
-        private void RecordEntryValue(PerformanceTimeEntry entry, Func<double> valueFunc)
+        private void RecordEntryValue(PerformanceTimeEntry entry, Func<double, double> valueFunc, bool shouldResetOnLog)
         {
             lock (entry)
             {
-                var value = valueFunc();
+                var value = valueFunc(entry.Last);
                 double total = entry.Instances * entry.Average;
                 entry.Instances++;
+                entry.ShouldReset = shouldResetOnLog;
                 entry.Average = (total + value) / entry.Instances;
-                entry.Maximum = Math.Max(entry.Maximum, value);
-                entry.Minimum = Math.Min(entry.Minimum, value);
+                entry.Maximum = entry.LastMeasureTime == default(DateTime) ? value : Math.Max(entry.Minimum, value);
+                entry.Minimum = entry.LastMeasureTime == default(DateTime) ? value : Math.Min(entry.Minimum, value);
                 var now = DateTime.UtcNow;
+                UpdateTimeWeightedAvg(entry, now);
+                entry.LastMeasureTime = now;
+                entry.Last = value;
+            }
+        }
+
+        private static void UpdateTimeWeightedAvg(PerformanceTimeEntry entry, DateTime now)
+        {
+            lock (entry)
+            {
                 if (entry.LastMeasureTime != default(DateTime))
                 {
                     double milliSoFar = 0;
@@ -106,12 +130,10 @@ namespace Google.Cloud.Spanner.V1.Logging
                     entry.TimeWeightedAverage = (milliSoFar * entry.TimeWeightedAverage + entry.Last * deltaTime) /
                                                 entry.TotalTime.TotalMilliseconds;
                 }
-                entry.LastMeasureTime = now;
-                entry.Last = value;
             }
         }
 
-        public override void LogPerformanceCounter(string name, double value)
+        public override void LogPerformanceCounter(string name, Func<double, double> valueFunc, bool shouldResetOnLog)
         {
             if (Interlocked.CompareExchange(ref _perfLoggingTaskEnabled, 1, 0) == 0)
             {
@@ -119,11 +141,12 @@ namespace Google.Cloud.Spanner.V1.Logging
                 Task.Run(PerformanceLogAsync);
             }
 
-            RecordEntryValue(_perfCounterDictionary.GetOrAdd(name, n => new PerformanceTimeEntry()), () => value);
+            RecordEntryValue(_perfCounterDictionary.GetOrAdd(name, n => new PerformanceTimeEntry()), valueFunc, shouldResetOnLog);
         }
 
         class PerformanceTimeEntry
         {
+            public bool ShouldReset { get; set; }
             public int Instances { get; set; }
             public double Average { get; set; }
             public double TimeWeightedAverage { get; set; }

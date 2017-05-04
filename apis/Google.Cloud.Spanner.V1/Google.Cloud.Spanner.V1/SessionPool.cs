@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Google.Apis.Util;
 using Google.Cloud.Spanner.V1.Logging;
+using Grpc.Core;
 
 namespace Google.Cloud.Spanner.V1
 {
@@ -94,7 +95,7 @@ namespace Google.Cloud.Spanner.V1
                 }
                 else
                 {
-                    throw new InvalidOperationException("Number of available Sessions exhausted.");
+                    throw new RpcException(new Status(StatusCode.ResourceExhausted, "Number of available Sessions exhausted."));
                 }
             }
         }
@@ -166,7 +167,7 @@ namespace Google.Cloud.Spanner.V1
 
         private static void LogSessionsInUse()
         {
-            Logger.LogPerformanceCounter("SessionsInUse", () => s_sessionsInUse.Count);
+            Logger.LogPerformanceCounter("Session.ActiveCount", () => s_sessionsInUse.Count);
         }
 
         /// <summary>
@@ -234,7 +235,7 @@ namespace Google.Cloud.Spanner.V1
                 await result.Client.DeleteSessionAsync(session.SessionName).ConfigureAwait(false);
                 return;
             }
-            throw new InvalidOperationException("ClosePooledSession was not able to locate the provided session.");
+            throw new InvalidOperationException("Close Session was not able to locate the provided session.");
         }
 
         private static void ReSortMru(SessionPoolImpl targetPool)

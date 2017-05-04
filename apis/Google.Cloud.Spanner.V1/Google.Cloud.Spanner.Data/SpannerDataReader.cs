@@ -19,6 +19,7 @@ using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Cloud.Spanner.V1;
+using Google.Cloud.Spanner.V1.Logging;
 using Google.Protobuf.WellKnownTypes;
 using static System.String;
 
@@ -40,14 +41,19 @@ namespace Google.Cloud.Spanner
         private ResultSetMetadata _metadata;
         private readonly List<Value> _innerList = new List<Value>();
         private Dictionary<string, int> _fieldIndex;
+        private static long s_readerCount;
 
         internal SpannerDataReader(ReliableStreamReader resultset)
         {
+            resultset.AssertNotNull(nameof(resultset));
+            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount", () => Interlocked.Increment(ref s_readerCount));
             _resultset = resultset;
         }
 
         internal SpannerDataReader(ReliableStreamReader resultset, SpannerConnection connectionToClose)
         {
+            resultset.AssertNotNull(nameof(resultset));
+            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount", () => Interlocked.Increment(ref s_readerCount));
             _resultset = resultset;
             _connectionToClose = connectionToClose;
         }
@@ -70,6 +76,7 @@ namespace Google.Cloud.Spanner
 
         private async Task<int> GetFieldIndexAsync(string fieldName, CancellationToken cancellationToken)
         {
+            fieldName.AssertNotNullOrEmpty(nameof(fieldName));
             if (_fieldIndex == null)
             {
                 _fieldIndex = new Dictionary<string, int>();
@@ -107,7 +114,8 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
         {
-            throw new NotImplementedException();
+            //todo here.
+            throw new NotSupportedException("Spanner does not yet support conversion to byte arrays.");
         }
 
         /// <inheritdoc />
@@ -119,7 +127,8 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override long GetChars(int i, long fieldoffset, char[] buffer, int bufferoffset, int length)
         {
-            throw new NotSupportedException();
+            //todo here.
+            throw new NotSupportedException("Spanner does not yet support conversion to char arrays.");
         }
 
         /// <inheritdoc />
@@ -228,6 +237,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override int GetOrdinal(string name)
         {
+            name.AssertNotNullOrEmpty(nameof(name));
             var fields = _resultset.GetMetadataAsync(CancellationToken.None).Result.RowType.Fields;
             for (int i = 0; i < fields.Count; i++)
             {
@@ -283,35 +293,42 @@ namespace Google.Cloud.Spanner
             return ReadAsync(CancellationToken.None).Result;
         }
 
-        private async Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
+        private Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
         {
-            return _metadata ?? (_metadata = await _resultset.GetMetadataAsync(cancellationToken).ConfigureAwait(false));
+            return ExecuteHelper.WithErrorTranslationAndProfiling(async ()
+                => _metadata ?? (_metadata = await _resultset.GetMetadataAsync(cancellationToken)
+                       .ConfigureAwait(false)), "SpannerDataReader.GetMetadata");
         }
 
         /// <inheritdoc />
-        public override async Task<bool> ReadAsync(CancellationToken cancellationToken)
+        public override Task<bool> ReadAsync(CancellationToken cancellationToken)
         {
-            await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
-            _innerList.Clear();
-            //read # values == # fields.
-            var first = await _resultset.Next(cancellationToken).ConfigureAwait(false);
-            if (first == null)
+            return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
             {
-                return false;
-            }
-            _innerList.Add(first);
-            //we expect to get full rows...
-            for (int i = 0; i < _metadata.RowType.Fields.Count - 1; i++)
-            {
-                _innerList.Add(await _resultset.Next(cancellationToken).ConfigureAwait(false));
-            }
+                await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+                _innerList.Clear();
+                //read # values == # fields.
+                var first = await _resultset.Next(cancellationToken).ConfigureAwait(false);
+                if (first == null)
+                {
+                    return false;
+                }
+                _innerList.Add(first);
+                //we expect to get full rows...
+                for (int i = 0; i < _metadata.RowType.Fields.Count - 1; i++)
+                {
+                    _innerList.Add(await _resultset.Next(cancellationToken).ConfigureAwait(false));
+                }
 
-            return true;
+                return true;
+            }, "SpannerDataReader.Read");
         }
 
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
+            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount", () => Interlocked.Decrement(ref s_readerCount));
+
             _resultset?.Close();
             _connectionToClose?.Close();
             base.Dispose(disposing);

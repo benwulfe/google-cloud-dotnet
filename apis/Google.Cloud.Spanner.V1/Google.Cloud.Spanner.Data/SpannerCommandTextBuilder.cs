@@ -14,7 +14,6 @@
 
 using System;
 using System.Linq;
-using Google.Apis.Util;
 
 // ReSharper disable UnusedParameter.Local
 
@@ -39,7 +38,7 @@ namespace Google.Cloud.Spanner
         /// <exception cref="InvalidOperationException"></exception>
         public SpannerCommandTextBuilder(string commandText)
         {
-            commandText.ThrowIfNullOrEmpty(nameof(commandText));
+            commandText.AssertNotNullOrEmpty(nameof(commandText));
             var commandSections = commandText.Split(' ');
             if (commandSections.Length < 2)
                 throw new InvalidOperationException($"{commandText} is not a recognized Spanner command.");
@@ -84,43 +83,43 @@ namespace Google.Cloud.Spanner
 
         /// <summary>
         /// </summary>
-        /// <param name="databaseTable"></param>
+        /// <param name="databaseTableName"></param>
         /// <returns></returns>
-        public static SpannerCommandTextBuilder CreateDeleteTextBuilder(string databaseTable)
+        public static SpannerCommandTextBuilder CreateDeleteTextBuilder(string databaseTableName)
         {
-            ValidateTable(databaseTable);
+            ValidateTable(databaseTableName);
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.Delete,
-                TargetTable = databaseTable,
-                CommandText = $"{s_deleteCommand} {databaseTable}"
+                TargetTable = databaseTableName,
+                CommandText = $"{s_deleteCommand} {databaseTableName}"
             };
         }
 
         /// <summary>
         /// </summary>
-        /// <param name="databaseTable"></param>
+        /// <param name="databaseTableName"></param>
         /// <returns></returns>
-        public static SpannerCommandTextBuilder CreateInsertOrUpdateTextBuilder(string databaseTable)
+        public static SpannerCommandTextBuilder CreateInsertOrUpdateTextBuilder(string databaseTableName)
         {
-            ValidateTable(databaseTable);
+            ValidateTable(databaseTableName);
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.InsertOrUpdate,
-                TargetTable = databaseTable,
-                CommandText = $"{s_insertUpdateCommand} {databaseTable}"
+                TargetTable = databaseTableName,
+                CommandText = $"{s_insertUpdateCommand} {databaseTableName}"
             };
         }
 
         /// <summary>
         /// </summary>
-        /// <param name="databaseTable"></param>
+        /// <param name="databaseTableName"></param>
         /// <returns></returns>
-        public static SpannerCommandTextBuilder CreateInsertTextBuilder(string databaseTable)
+        public static SpannerCommandTextBuilder CreateInsertTextBuilder(string databaseTableName)
         {
-            ValidateTable(databaseTable);
+            ValidateTable(databaseTableName);
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.Insert,
-                TargetTable = databaseTable,
-                CommandText = $"{s_insertCommand} {databaseTable}"
+                TargetTable = databaseTableName,
+                CommandText = $"{s_insertCommand} {databaseTableName}"
             };
         }
 
@@ -138,15 +137,15 @@ namespace Google.Cloud.Spanner
 
         /// <summary>
         /// </summary>
-        /// <param name="databaseTable"></param>
+        /// <param name="databaseTableName"></param>
         /// <returns></returns>
-        public static SpannerCommandTextBuilder CreateUpdateTextBuilder(string databaseTable)
+        public static SpannerCommandTextBuilder CreateUpdateTextBuilder(string databaseTableName)
         {
-            ValidateTable(databaseTable);
+            ValidateTable(databaseTableName);
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.Update,
-                TargetTable = databaseTable,
-                CommandText = $"{s_updateCommand} {databaseTable}"
+                TargetTable = databaseTableName,
+                CommandText = $"{s_updateCommand} {databaseTableName}"
             };
         }
 
@@ -156,6 +155,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static SpannerCommandTextBuilder FromCommandText(string commandText)
         {
+            commandText.AssertNotNullOrEmpty(nameof(commandText));
             return new SpannerCommandTextBuilder(commandText);
         }
 
@@ -186,7 +186,7 @@ namespace Google.Cloud.Spanner
 
         private static void ValidateTable(string databaseTableName)
         {
-            databaseTableName.ThrowIfNullOrEmpty(nameof(databaseTableName));
+            databaseTableName.AssertNotNullOrEmpty(nameof(databaseTableName));
             if (!databaseTableName.All(c => char.IsLetterOrDigit(c) || c == '_'))
                 throw new ArgumentException($"{nameof(databaseTableName)} only allows letters, numbers or underscore");
         }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using Google.Protobuf.WellKnownTypes;
 
@@ -55,7 +56,7 @@ namespace Google.Cloud.Spanner.V1
                     }
                     break;
                 default:
-                    throw new InvalidOperationException($"The value of type {thisValue.KindCase} cannot be merged as a chunk.");
+                    throw new IOException($"The value of type {thisValue.KindCase} cannot be merged as a chunk.");
             }
         }
 

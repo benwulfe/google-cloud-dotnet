@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Cloud.Spanner.V1;
+using Google.Cloud.Spanner.V1.Logging;
 
 namespace Google.Cloud.Spanner
 {
@@ -15,6 +16,7 @@ namespace Google.Cloud.Spanner
 
         public EphemeralTransaction(SpannerConnection connection)
         {
+            connection.AssertNotNull(nameof(connection));
             _connection = connection;
         }
 
@@ -29,7 +31,10 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public async Task<int> ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
         {
+            mutations.AssertNotNull(nameof(mutations));
+            Logger.Debug(() => "Executing a mutation change through an ephemeral transaction.");
             int count;
+
             using (var transaction =  await _connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
             {
                 count = await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken).ConfigureAwait(false);
@@ -38,24 +43,29 @@ namespace Google.Cloud.Spanner
             return count;
         }
 
-        public async Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
+        public Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
         {
-            using (SpannerConnection.SessionHolder holder = await SpannerConnection.SessionHolder.Allocate(_connection, cancellationToken).ConfigureAwait(false))
+            return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
             {
-                var streamReader = _connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest
-                {
-                    Sql = sql,
-                }, holder.TakeOwnership());
+                sql.AssertNotNullOrEmpty(nameof(sql));
+                Logger.Debug(() => "Executing a query through an ephemeral transaction.");
 
-                streamReader.StreamClosed += (o, e) =>
+                using (SpannerConnection.SessionHolder holder = await SpannerConnection.SessionHolder
+                    .Allocate(_connection, cancellationToken)
+                    .ConfigureAwait(false))
                 {
-                    _connection.ReleaseSession(streamReader.Session);
-                };
+                    var streamReader = _connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest {
+                        Sql = sql,
+                    }, holder.TakeOwnership());
 
-                return streamReader;
-            }
+                    streamReader.StreamClosed += (o, e) =>
+                    {
+                        _connection.ReleaseSession(streamReader.Session);
+                    };
+
+                    return streamReader;
+                }
+            }, "Transaction.ExecuteQuery");
         }
-
-
     }
 }

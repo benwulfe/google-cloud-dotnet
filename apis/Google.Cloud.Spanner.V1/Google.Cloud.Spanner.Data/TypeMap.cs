@@ -331,11 +331,11 @@ namespace Google.Cloud.Spanner
                         }
                         return dictionary;
                     default:
-                        throw new InvalidOperationException(
+                        throw new ArgumentException(
                             $"Invalid Type conversion from {wireValue.KindCase} to {targetClrType.FullName}");
                 }
             }
-            throw new InvalidOperationException(
+            throw new ArgumentException(
                 $"Invalid Type conversion from {wireValue.KindCase} to {targetClrType.FullName}");
         }
 

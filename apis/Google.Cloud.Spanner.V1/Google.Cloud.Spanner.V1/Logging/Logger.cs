@@ -61,8 +61,9 @@ namespace Google.Cloud.Spanner.V1.Logging
         /// 
         /// </summary>
         /// <param name="name"></param>
-        /// <param name="value"></param>
-        public abstract void LogPerformanceCounter(string name, double value);
+        /// <param name="valueFunc"></param>
+        /// <param name="shouldResetOnLog"></param>
+        public abstract void LogPerformanceCounter(string name, Func<double, double> valueFunc, bool shouldResetOnLog);
 
         /// <summary>
         /// 
@@ -74,6 +75,10 @@ namespace Google.Cloud.Spanner.V1.Logging
         /// </summary>
         public static bool LogPerformanceTraces { get; set; }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        public static int PerformanceTraceLogInterval { get; set; } = 30000;
 
         internal static void Debug(Func<string> messageFunc)
         {
@@ -111,7 +116,15 @@ namespace Google.Cloud.Spanner.V1.Logging
         {
             if (LogPerformanceTraces)
             {
-                Instance.LogPerformanceCounter(name, valueFunc());
+                Instance.LogPerformanceCounter(name, x => valueFunc(), false);
+            }
+        }
+
+        internal static void LogPerformanceCounterFn(string name, Func<double, double> valueFunc)
+        {
+            if (LogPerformanceTraces)
+            {
+                Instance.LogPerformanceCounter(name, valueFunc, true);
             }
         }
     }

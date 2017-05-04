@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,17 +45,19 @@ namespace Google.Cloud.Spanner.V1
             var task = Task.Delay(SessionPool.PoolEvictTimeSpan, cancellationToken);
             return task.ContinueWith(async (delayTask, o) => 
             {
+                Logger.Debug(() => "Evict timer triggered.");
                 await EvictImmediately(session, cancellationToken);
             }, null, cancellationToken);
         }
 
         private static void LogSessionsPooled()
         {
-            Logger.LogPerformanceCounter("SessionsPooled", () => s_activeSessionsPooled);
+            Logger.LogPerformanceCounter("Session.PooledCount", () => s_activeSessionsPooled);
         }
 
         private async Task EvictImmediately(Session session, CancellationToken cancellationToken)
         {
+            Logger.Debug(() => "Evicting a session from the pool.");
             SessionPoolEntry entry = default(SessionPoolEntry);
             lock (_sessionMruStack)
             {
@@ -82,6 +85,7 @@ namespace Google.Cloud.Spanner.V1
             {
                 if (_sessionMruStack.Count > 0)
                 {
+                    Logger.Debug(() => "Searching for a session with matching transaction semantics.");
                     bool found = false;
                     for (int indexToUse = 0; indexToUse < _sessionMruStack.Count
                         && indexToUse < MaximumLinearSearchDepth; indexToUse++)
@@ -89,6 +93,7 @@ namespace Google.Cloud.Spanner.V1
                         entry = _sessionMruStack[indexToUse];
                         if (Equals(entry.Session.GetLastUsedTransactionOptions(), options))
                         {
+                            Logger.Debug(() => "found a session with matching transaction semantics.");
                             found = true;
                             _sessionMruStack.RemoveAt(indexToUse);
                             break;
@@ -96,6 +101,7 @@ namespace Google.Cloud.Spanner.V1
                     }
                     if (!found)
                     {
+                        Logger.Debug(() => "did not find a session with matching transaction semantics - popping at top.");
                         entry = _sessionMruStack[0];
                         _sessionMruStack.RemoveAt(0);
                     }
@@ -121,11 +127,24 @@ namespace Google.Cloud.Spanner.V1
 
         public async Task<Session> AcquireSessionAsync(TransactionOptions options, CancellationToken cancellationToken)
         {
+            Logger.Debug(() => "Attempting to acquire a session from the pool.");
             SessionPoolEntry sessionEntry;
             if (!TryPop(options, out sessionEntry))
             {
+                Logger.Debug(() => "Attempting to acquire a session from the pool failed - creating a new instance.");
+                Stopwatch sw = null;
+                if (Logger.LogPerformanceTraces)
+                {
+                    sw = new Stopwatch();
+                    sw.Start();
+                }
                 //create a new session, blocking or throwing if at the limit.
-                return await Key.Client.CreateSessionAsync(new DatabaseName(Key.Project, Key.Instance, Key.Database), cancellationToken).ConfigureAwait(false);
+                var result = await Key.Client.CreateSessionAsync(new DatabaseName(Key.Project, Key.Instance, Key.Database), cancellationToken).ConfigureAwait(false);
+                if (sw != null)
+                {
+                    Logger.LogPerformanceCounterFn("Session.CreateTime", x => sw.ElapsedMilliseconds);
+                }
+                return result;
             }
             MarkUsed();
             //note that the evict task will only actually delete the session if it was able to remove it from the pool.
@@ -163,6 +182,7 @@ namespace Google.Cloud.Spanner.V1
 
         public void ReleaseSessionToPool(SpannerClient client, Session session)
         {
+            Logger.Debug(() => "Placing session back into the pool and starting the evict timer.");
             //start evict timer.
             SessionPoolEntry entry = new SessionPoolEntry {
                 Session = session,

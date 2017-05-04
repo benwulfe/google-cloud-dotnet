@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Google.Cloud.Spanner
 {
@@ -13,7 +16,9 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static bool IsTransientSpannerFault(this Exception exception)
         {
-            SpannerException spannerException = exception as SpannerException;
+            SpannerException spannerException;
+            SpannerException.TryTranslateRpcException(exception, out spannerException);
+
             return spannerException != null && spannerException.IsRetryable;
         }
     }
