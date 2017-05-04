@@ -20,7 +20,7 @@ using System.Data.Common;
 
 namespace Google.Cloud.Spanner
 {
-#if NET451
+#if NET45 || NET451
 
     /// <summary>
     /// </summary>

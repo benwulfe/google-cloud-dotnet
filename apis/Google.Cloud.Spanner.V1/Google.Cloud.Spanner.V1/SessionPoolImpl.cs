@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Cloud.Spanner.V1.Logging;
 
 namespace Google.Cloud.Spanner.V1
 {
@@ -47,6 +48,11 @@ namespace Google.Cloud.Spanner.V1
             }, null, cancellationToken);
         }
 
+        private static void LogSessionsPooled()
+        {
+            Logger.LogPerformanceCounter("SessionsPooled", () => s_activeSessionsPooled);
+        }
+
         private async Task EvictImmediately(Session session, CancellationToken cancellationToken)
         {
             SessionPoolEntry entry = default(SessionPoolEntry);
@@ -58,6 +64,7 @@ namespace Google.Cloud.Spanner.V1
                     entry = _sessionMruStack[found];
                     _sessionMruStack.RemoveAt(found);
                     Interlocked.Decrement(ref s_activeSessionsPooled);
+                    LogSessionsPooled();
                 }
             }
             if (entry.Session != null)
@@ -94,6 +101,7 @@ namespace Google.Cloud.Spanner.V1
                     }
 
                     Interlocked.Decrement(ref s_activeSessionsPooled);
+                    LogSessionsPooled();
                     return true;
                 }
             }
@@ -107,6 +115,7 @@ namespace Google.Cloud.Spanner.V1
             {
                 _sessionMruStack.Insert(0, entry);
                 Interlocked.Increment(ref s_activeSessionsPooled);
+                LogSessionsPooled();
             }
         }
 
@@ -136,6 +145,7 @@ namespace Google.Cloud.Spanner.V1
                     sessionEntry = _sessionMruStack[_sessionMruStack.Count - 1];
                     _sessionMruStack.RemoveAt(_sessionMruStack.Count - 1);
                     Interlocked.Decrement(ref s_activeSessionsPooled);
+                    LogSessionsPooled();
                 }
             }
             if (sessionEntry.Session == null || sessionEntry.EvictTaskCancellationSource == null)

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Apis.Util;
+using Google.Cloud.Spanner.V1.Logging;
 
 namespace Google.Cloud.Spanner.V1
 {
@@ -142,6 +143,7 @@ namespace Google.Cloud.Spanner.V1
                     // to add another poolEntry.
                     ReSortMru(targetPool);
                     s_sessionsInUse.AddOrUpdate(session, x => sessionPoolKey, (x, y) => sessionPoolKey);
+                    LogSessionsInUse();
                 }
                 return session;
             }
@@ -162,6 +164,11 @@ namespace Google.Cloud.Spanner.V1
             }
         }
 
+        private static void LogSessionsInUse()
+        {
+            Logger.LogPerformanceCounter("SessionsInUse", () => s_sessionsInUse.Count);
+        }
+
         /// <summary>
         /// Releases a session back into the pool, possibly causing another entry to be evicted if the maximum pool size has been
         /// reached.
@@ -176,6 +183,7 @@ namespace Google.Cloud.Spanner.V1
             SessionPoolKey result;
             if (s_sessionsInUse.TryRemove(session, out result))
             {
+                LogSessionsInUse();
                 SignalAnyWaitingRequests();
                 SessionPoolImpl targetPool = GlobalPool.GetOrAdd(result,
                                              key => new SessionPoolImpl(key));
@@ -216,6 +224,7 @@ namespace Google.Cloud.Spanner.V1
             SessionPoolKey result;
             if (s_sessionsInUse.TryRemove(session, out result))
             {
+                LogSessionsInUse();
                 SignalAnyWaitingRequests();
                 await result.Client.DeleteSessionAsync(session.SessionName).ConfigureAwait(false);
                 return;

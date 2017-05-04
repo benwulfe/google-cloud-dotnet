@@ -20,7 +20,6 @@ namespace Google.Cloud.Spanner.V1
     /// </summary>
     public sealed class ReliableStreamReader : IDisposable
     {
-        //WIP: add actual stream reads, retries, etc.
         private AsyncServerStreamingCall<PartialResultSet> _currentCall;
         private readonly object _sync = new object();
         private readonly SpannerClient _spannerClient;

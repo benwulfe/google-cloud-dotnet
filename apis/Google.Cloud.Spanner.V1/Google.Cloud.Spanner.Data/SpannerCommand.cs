@@ -29,7 +29,7 @@ namespace Google.Cloud.Spanner
     /// <summary>
     /// </summary>
     public sealed class SpannerCommand : DbCommand
-#if NET451
+#if NET45 || NET451
         , ICloneable
 #endif
     {

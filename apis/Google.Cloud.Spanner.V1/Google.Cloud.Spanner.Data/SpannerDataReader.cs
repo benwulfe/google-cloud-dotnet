@@ -22,7 +22,7 @@ using Google.Cloud.Spanner.V1;
 using Google.Protobuf.WellKnownTypes;
 using static System.String;
 
-#if NET451
+#if NET45 || NET451
 using System.Data;
 
 #endif
@@ -317,7 +317,7 @@ namespace Google.Cloud.Spanner
             base.Dispose(disposing);
         }
 
-#if NET451
+#if NET45 || NET451
         /// <inheritdoc />
         public override void Close()
         {

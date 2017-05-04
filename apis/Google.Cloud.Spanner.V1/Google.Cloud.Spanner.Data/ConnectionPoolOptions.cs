@@ -68,6 +68,63 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
+        /// Sets the log level for diagnostic logs sent to Trace (for desktop) or stderr (for .Net Core).
+        /// </summary>
+        public LogLevel LogLevel
+        {
+            get
+            {
+                switch (V1.Logging.Logger.LogLevel)
+                {
+                    case V1.Logging.LogLevel.Debug:
+                        return LogLevel.Debug;
+                    case V1.Logging.LogLevel.Info:
+                        return LogLevel.Info;
+                    case V1.Logging.LogLevel.Warn:
+                        return LogLevel.Warn;
+                    case V1.Logging.LogLevel.Error:
+                        return LogLevel.Error;
+                    case V1.Logging.LogLevel.None:
+                        return LogLevel.None;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+            set
+            {
+                switch (value)
+                {
+                    case LogLevel.Debug:
+                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Debug;
+                        break;
+                    case LogLevel.Info:
+                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Info;
+                        break;
+                    case LogLevel.Warn:
+                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Warn;
+                        break;
+                    case LogLevel.Error:
+                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Error;
+                        break;
+                    case LogLevel.None:
+                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.None;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(value), value, null);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool LogPerformanceTraces
+        {
+            get { return V1.Logging.Logger.LogPerformanceTraces; }
+            set { V1.Logging.Logger.LogPerformanceTraces = value; }
+        }
+
+        /// <summary>
         /// </summary>
         public int TimeoutMilliseconds { get; set; } = 600000;
     }

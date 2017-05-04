@@ -24,7 +24,7 @@ namespace Google.Cloud.Spanner
     /// <summary>
     /// </summary>
     public sealed class SpannerParameter : DbParameter
-#if NET451
+#if NET45 || NET451
         , ICloneable
 #endif
     {
@@ -108,7 +108,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override bool SourceColumnNullMapping { get; set; } = true;
 
-#if NET451
+#if NET45 || NET451
 
         /// <inheritdoc />
         public override DataRowVersion SourceVersion { get; set; } = DataRowVersion.Current;

@@ -14,6 +14,7 @@ namespace WindowsFormsApplication1
 
         private async void button1_Click(object sender, EventArgs e)
         {
+            SpannerConnection.ConnectionPoolOptions.LogPerformanceTraces = true;
             button1.Text = @"Working!";
             button1.Enabled = false;
             using (var connection = new SpannerConnection("Data Source=spanneref/myspanner/mydatabase"))

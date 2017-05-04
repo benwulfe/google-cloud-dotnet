@@ -54,7 +54,7 @@ namespace Google.Cloud.Spanner
             throw new NotImplementedException();
         }
 
-#if NET451
+#if NET45 || NET451
 
         /// <inheritdoc />
         public override DbDataAdapter CreateDataAdapter()

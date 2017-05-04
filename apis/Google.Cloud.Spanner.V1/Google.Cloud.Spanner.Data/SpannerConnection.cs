@@ -21,7 +21,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Util;
 using Google.Cloud.Spanner.V1;
 
-#if NET451
+#if NET45 || NET451
 using Transaction = System.Transactions.Transaction;
 
 #endif
@@ -44,7 +44,6 @@ namespace Google.Cloud.Spanner
 
         private static readonly TransactionOptions s_defaultTransactionOptions = new TransactionOptions();
 
-        private SpannerBatchOperation _activeBatchOperation;
         private SpannerClient _client;
         private SpannerConnectionStringBuilder _connectionStringBuilder;
         private Session _sharedSession;
@@ -130,18 +129,6 @@ namespace Google.Cloud.Spanner
         internal bool IsClosed => (State & ConnectionState.Open) == 0;
 
         internal bool IsOpen => (State & ConnectionState.Open) == ConnectionState.Open;
-
-        /// <summary>
-        /// </summary>
-        /// <returns></returns>
-        public SpannerBatchOperation BeginBatchOperation()
-        {
-            //This may be called while the connection is closed.
-            var newBatchOperation = new SpannerBatchOperation(this);
-            if (Interlocked.CompareExchange(ref _activeBatchOperation, newBatchOperation, null)
-                != null) throw new InvalidOperationException("You may only create a single Batch operation at a time.");
-            return _activeBatchOperation;
-        }
 
         /// <summary>
         /// 
@@ -504,7 +491,7 @@ namespace Google.Cloud.Spanner
         }
         internal SpannerClient SpannerClient => _client;
 
-#if NET451
+#if NET45 || NET451
 
         /// <inheritdoc />
         public override void EnlistTransaction(Transaction transaction)
