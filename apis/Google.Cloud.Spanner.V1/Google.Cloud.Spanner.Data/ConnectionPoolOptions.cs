@@ -136,5 +136,10 @@ namespace Google.Cloud.Spanner
         /// <summary>
         /// </summary>
         public int TimeoutMilliseconds { get; set; } = 600000;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public TimeSpan KeepAliveIntervalMinutes { get; set; } = TimeSpan.FromMinutes(55);
     }
 }

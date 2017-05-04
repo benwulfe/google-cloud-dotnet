@@ -19,6 +19,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Spanner.V1;
+using Google.Cloud.Spanner.V1.Logging;
 using Google.Protobuf.WellKnownTypes;
 
 #if NET45 || NET451
@@ -219,6 +220,7 @@ namespace Google.Cloud.Spanner
             lock (_sync)
             {
                 if (IsClosed) return;
+                _keepAliveCancellation?.Cancel();
                 primarySessionInUse = _sessionRefCount > 0;
                 _state = ConnectionState.Closed;
                 //we do not await the actual session close, we let that happen async.
@@ -326,6 +328,8 @@ namespace Google.Cloud.Spanner
                             cancellationToken)
                         .ConfigureAwait(false);
                     _sessionRefCount = 0;
+                    _keepAliveCancellation = new CancellationTokenSource();
+                    _keepAliveTask = Task.Run(() => KeepAlive(_keepAliveCancellation.Token), _keepAliveCancellation.Token);
                 }
                 finally
                 {
@@ -476,6 +480,41 @@ namespace Google.Cloud.Spanner
 
                 return result;
             }, "SpannerConnection.AllocateSession");
+        }
+
+        private CancellationTokenSource _keepAliveCancellation;
+        private Task _keepAliveTask;
+
+        private async Task KeepAlive(CancellationToken cancellationToken)
+        {
+            ExecuteSqlRequest request = new ExecuteSqlRequest
+            {
+                Sql = "SELECT 1",
+            };
+
+            while (true)
+            {
+                int waitTime = (int)ConnectionPoolOptions.KeepAliveIntervalMinutes.TotalMilliseconds;
+                await Task.Delay(waitTime, cancellationToken);
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                Session sharedSession = _sharedSession;
+                if (sharedSession != null)
+                {
+                    try
+                    {
+                        request.SessionAsSessionName = sharedSession.SessionName;
+                        await _client.ExecuteSqlAsync(request);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Warn(() => $"Exception attempting to keep session alive: {e}");
+                        return;
+                    }
+                }
+            }
+            // ReSharper disable once FunctionNeverReturns
         }
 
         /// <summary>
