@@ -37,6 +37,5 @@ namespace Google.Cloud.Spanner
         /// <summary>
         /// </summary>
         InsertOrUpdate = 4,
-
     }
 }

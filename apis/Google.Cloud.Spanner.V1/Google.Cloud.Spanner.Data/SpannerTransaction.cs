@@ -34,13 +34,15 @@ namespace Google.Cloud.Spanner
         private readonly List<Mutation> _mutations = new List<Mutation>();
         private static long s_transactionCount;
 
-        internal SpannerTransaction(SpannerConnection connection, TransactionMode mode, Session session, Transaction transaction) 
+        internal SpannerTransaction(SpannerConnection connection, TransactionMode mode, Session session,
+            Transaction transaction)
         {
             connection.AssertNotNull(nameof(connection));
             session.AssertNotNull(nameof(session));
             transaction.AssertNotNull(nameof(transaction));
 
-            Logger.LogPerformanceCounter("Transactions.ActiveCount", () => Interlocked.Increment(ref s_transactionCount));
+            Logger.LogPerformanceCounter("Transactions.ActiveCount",
+                () => Interlocked.Increment(ref s_transactionCount));
 
             Session = session;
             _transaction = transaction;
@@ -67,7 +69,8 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            Logger.LogPerformanceCounter("Transactions.ActiveCount", () => Interlocked.Decrement(ref s_transactionCount));
+            Logger.LogPerformanceCounter("Transactions.ActiveCount",
+                () => Interlocked.Decrement(ref s_transactionCount));
             _connection.ReleaseSession(Session);
         }
 
@@ -132,10 +135,11 @@ namespace Google.Cloud.Spanner
         {
             CheckCompatibleMode(mode);
             _transaction.AssertTrue(x => x != null, "Transaction should have been created prior to use.");
-            return new TransactionSelector { Id = _transaction?.Id };
+            return new TransactionSelector {Id = _transaction?.Id};
         }
 
-        Task<int> ISpannerTransaction.ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
+        Task<int> ISpannerTransaction.ExecuteMutationsAsync(List<Mutation> mutations,
+            CancellationToken cancellationToken)
         {
             mutations.AssertNotNull(nameof(mutations));
             CheckCompatibleMode(TransactionMode.ReadWrite);
@@ -147,7 +151,8 @@ namespace Google.Cloud.Spanner
             return taskCompletionSource.Task;
         }
 
-        Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
+        Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(string sql,
+            CancellationToken cancellationToken)
         {
             sql.AssertNotNullOrEmpty(nameof(sql));
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>

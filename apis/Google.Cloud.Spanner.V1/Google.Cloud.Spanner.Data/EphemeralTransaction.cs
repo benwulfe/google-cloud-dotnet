@@ -35,9 +35,10 @@ namespace Google.Cloud.Spanner
             Logger.Debug(() => "Executing a mutation change through an ephemeral transaction.");
             int count;
 
-            using (var transaction =  await _connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+            using (var transaction = await _connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
             {
-                count = await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken).ConfigureAwait(false);
+                count = await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken)
+                    .ConfigureAwait(false);
                 await transaction.CommitAsync().ConfigureAwait(false);
             }
             return count;
@@ -58,10 +59,7 @@ namespace Google.Cloud.Spanner
                         Sql = sql,
                     }, holder.TakeOwnership());
 
-                    streamReader.StreamClosed += (o, e) =>
-                    {
-                        _connection.ReleaseSession(streamReader.Session);
-                    };
+                    streamReader.StreamClosed += (o, e) => { _connection.ReleaseSession(streamReader.Session); };
 
                     return streamReader;
                 }

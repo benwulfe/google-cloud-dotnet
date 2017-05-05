@@ -22,7 +22,6 @@ using Google.Cloud.Spanner.V1;
 using Google.Cloud.Spanner.V1.Logging;
 using Google.Protobuf.WellKnownTypes;
 using static System.String;
-
 #if NET45 || NET451
 using System.Data;
 
@@ -46,14 +45,16 @@ namespace Google.Cloud.Spanner
         internal SpannerDataReader(ReliableStreamReader resultset)
         {
             resultset.AssertNotNull(nameof(resultset));
-            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount", () => Interlocked.Increment(ref s_readerCount));
+            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount",
+                () => Interlocked.Increment(ref s_readerCount));
             _resultset = resultset;
         }
 
         internal SpannerDataReader(ReliableStreamReader resultset, SpannerConnection connectionToClose)
         {
             resultset.AssertNotNull(nameof(resultset));
-            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount", () => Interlocked.Increment(ref s_readerCount));
+            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount",
+                () => Interlocked.Increment(ref s_readerCount));
             _resultset = resultset;
             _connectionToClose = connectionToClose;
         }
@@ -93,6 +94,7 @@ namespace Google.Cloud.Spanner
             }
             return _fieldIndex[fieldName];
         }
+
         /// <inheritdoc />
         public override object this[string name] => this[GetFieldIndexAsync(name, CancellationToken.None).Result];
 
@@ -102,13 +104,13 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override bool GetBoolean(int i)
         {
-            return (bool)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(bool));
+            return (bool) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(bool));
         }
 
         /// <inheritdoc />
         public override byte GetByte(int i)
         {
-            return (byte)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(byte));
+            return (byte) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(byte));
         }
 
         /// <inheritdoc />
@@ -121,7 +123,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override char GetChar(int i)
         {
-            return (char)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(char));
+            return (char) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(char));
         }
 
         /// <inheritdoc />
@@ -140,19 +142,19 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override DateTime GetDateTime(int i)
         {
-            return (DateTime)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(DateTime));
+            return (DateTime) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(DateTime));
         }
 
         /// <inheritdoc />
         public override decimal GetDecimal(int i)
         {
-            return (decimal)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(decimal));
+            return (decimal) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(decimal));
         }
 
         /// <inheritdoc />
         public override double GetDouble(int i)
         {
-            return (double)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(double));
+            return (double) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(double));
         }
 
         /// <inheritdoc />
@@ -181,7 +183,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override float GetFloat(int i)
         {
-            return (float)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(float));
+            return (float) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(float));
         }
 
         /// <summary>
@@ -191,7 +193,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public Value GetJsonValue(int i)
         {
-            return (Value)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Value));
+            return (Value) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Value));
         }
 
         /// <summary>
@@ -201,31 +203,31 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public Timestamp GetTimestamp(int i)
         {
-            return (Timestamp)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Timestamp));
+            return (Timestamp) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Timestamp));
         }
 
         /// <inheritdoc />
         public override Guid GetGuid(int i)
         {
-            return (Guid)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Guid));
+            return (Guid) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Guid));
         }
 
         /// <inheritdoc />
         public override short GetInt16(int i)
         {
-            return (short)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(short));
+            return (short) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(short));
         }
 
         /// <inheritdoc />
         public override int GetInt32(int i)
         {
-            return (int)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(int));
+            return (int) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(int));
         }
 
         /// <inheritdoc />
         public override long GetInt64(int i)
         {
-            return (long)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(long));
+            return (long) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(long));
         }
 
         /// <inheritdoc />
@@ -250,13 +252,13 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override string GetString(int i)
         {
-            return (string)_innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(string));
+            return (string) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(string));
         }
 
         /// <inheritdoc />
         public override T GetFieldValue<T>(int ordinal)
         {
-            return (T)_innerList[ordinal].ConvertToClrType(GetSpannerFieldType(ordinal), typeof(T));
+            return (T) _innerList[ordinal].ConvertToClrType(GetSpannerFieldType(ordinal), typeof(T));
         }
 
         /// <inheritdoc />
@@ -327,7 +329,8 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount", () => Interlocked.Decrement(ref s_readerCount));
+            Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount",
+                () => Interlocked.Decrement(ref s_readerCount));
 
             _resultset?.Close();
             _connectionToClose?.Close();
@@ -335,6 +338,7 @@ namespace Google.Cloud.Spanner
         }
 
 #if NET45 || NET451
+
         /// <inheritdoc />
         public override void Close()
         {

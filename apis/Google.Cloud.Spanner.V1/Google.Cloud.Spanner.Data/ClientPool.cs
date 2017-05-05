@@ -71,14 +71,15 @@ namespace Google.Cloud.Spanner
                     {
                         //TODO use a custom channel with specified credentials instead of the pool.
                         _client = await SpannerClient.CreateAsync(_key.Endpoint ?? SpannerClient.DefaultEndpoint,
-                            new SpannerSettings
-                            {
-                                CallSettings = CallSettings.FromCallCredentials(_key.Credential.ToCallCredentials())
-                            }).ConfigureAwait(false);
+                                new SpannerSettings {
+                                    CallSettings = CallSettings.FromCallCredentials(_key.Credential.ToCallCredentials())
+                                })
+                            .ConfigureAwait(false);
                     }
                     else
                     {
-                        _client = await SpannerClient.CreateAsync(_key.Endpoint ?? SpannerClient.DefaultEndpoint).ConfigureAwait(false);
+                        _client = await SpannerClient.CreateAsync(_key.Endpoint ?? SpannerClient.DefaultEndpoint)
+                            .ConfigureAwait(false);
                     }
                 }
 
@@ -94,7 +95,8 @@ namespace Google.Cloud.Spanner
 
             public static ApplicationDefault Instance { get; } = new ApplicationDefault();
 
-            public Task<string> GetAccessTokenForRequestAsync(string authUri = null, CancellationToken cancellationToken = default(CancellationToken))
+            public Task<string> GetAccessTokenForRequestAsync(string authUri = null,
+                CancellationToken cancellationToken = default(CancellationToken))
             {
                 throw new NotImplementedException();
             }

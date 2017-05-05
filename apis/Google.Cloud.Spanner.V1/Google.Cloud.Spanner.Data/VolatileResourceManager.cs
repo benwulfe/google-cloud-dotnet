@@ -10,7 +10,6 @@ using Google.Cloud.Spanner.V1.Logging;
 
 namespace Google.Cloud.Spanner
 {
-
     internal sealed class VolatileResourceManager : ISinglePhaseNotification, ISpannerTransaction, IDisposable
     {
         private readonly SpannerConnection _spannerConnection;
@@ -28,38 +27,50 @@ namespace Google.Cloud.Spanner
             //note that we delay transaction creation (and thereby session allocation) 
             if (_timestampBound != null)
             {
-                return _transaction ?? (_transaction = await _spannerConnection.BeginReadOnlyTransactionAsync(_timestampBound, cancellationToken));
+                return _transaction ?? (_transaction =
+                           await _spannerConnection.BeginReadOnlyTransactionAsync(_timestampBound, cancellationToken));
             }
             return _transaction ?? (_transaction = await _spannerConnection.BeginTransactionAsync(cancellationToken));
         }
 
         public void Prepare(PreparingEnlistment preparingEnlistment)
         {
-            Logger.Warn(() => "Got a Prepare call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
-            preparingEnlistment.ForceRollback(new NotSupportedException("Spanner only supports single phase commit (Prepare not supported)."
-                                                                        + " This error can happen when attempting to use multiple transaction resources but may also happen for"
-                                                                        + " other reasons that cause a Transaction to use two-phase commit."));
+            Logger.Warn(
+                () =>
+                    "Got a Prepare call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
+            preparingEnlistment.ForceRollback(new NotSupportedException(
+                "Spanner only supports single phase commit (Prepare not supported)."
+                + " This error can happen when attempting to use multiple transaction resources but may also happen for"
+                + " other reasons that cause a Transaction to use two-phase commit."));
         }
 
         public void Commit(Enlistment enlistment)
         {
-            Logger.Warn(() => "Got a Commit call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
+            Logger.Warn(
+                () =>
+                    "Got a Commit call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
             throw new NotSupportedException("Spanner only supports single phase commit (2-P Commit not supported)."
-                                                                        + " This error can happen when attempting to use multiple transaction resources but may also happen for"
-                                                                        + " other reasons that cause a Transaction to use two-phase commit.");
+                                            +
+                                            " This error can happen when attempting to use multiple transaction resources but may also happen for"
+                                            + " other reasons that cause a Transaction to use two-phase commit.");
         }
 
         public void Rollback(Enlistment enlistment)
         {
-            Logger.Warn(() => "Got a Rollback call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
+            Logger.Warn(
+                () =>
+                    "Got a Rollback call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
             throw new NotSupportedException("Spanner only supports single phase commit (Rollback not supported)."
-                                            + " This error can happen when attempting to use multiple transaction resources but may also happen for"
+                                            +
+                                            " This error can happen when attempting to use multiple transaction resources but may also happen for"
                                             + " other reasons that cause a Transaction to use two-phase commit.");
         }
 
         public void InDoubt(Enlistment enlistment)
         {
-            Logger.Warn(() => "Got a InDoubt call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
+            Logger.Warn(
+                () =>
+                    "Got a InDoubt call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
             enlistment.Done();
         }
 
@@ -89,7 +100,7 @@ namespace Google.Cloud.Spanner
             {
                 throw new InvalidOperationException("Unable to obtain a spanner transaction to execute within.");
             }
-            return await ((ISpannerTransaction)transaction).ExecuteMutationsAsync(mutations, cancellationToken);
+            return await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken);
         }
 
         public async Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
@@ -99,7 +110,7 @@ namespace Google.Cloud.Spanner
             {
                 throw new InvalidOperationException("Unable to obtain a spanner transaction to execute within.");
             }
-            return await((ISpannerTransaction)transaction).ExecuteQueryAsync(sql, cancellationToken);
+            return await((ISpannerTransaction) transaction).ExecuteQueryAsync(sql, cancellationToken);
         }
 
         public void Dispose()
@@ -108,4 +119,5 @@ namespace Google.Cloud.Spanner
         }
     }
 }
+
 #endif

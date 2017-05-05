@@ -31,7 +31,7 @@ namespace Google.Cloud.Spanner
         /// <param name="code"></param>
         /// <param name="innerException"></param>
         internal SpannerException(ErrorCode code, RpcException innerException)
-            :base(GetMessageFromErrorCode(code), innerException)
+            : base(GetMessageFromErrorCode(code), innerException)
         {
             Logger.LogPerformanceCounterFn("SpannerException.Count", x => x + 1);
             ErrorCode = code;
@@ -49,7 +49,8 @@ namespace Google.Cloud.Spanner
         {
         }
 
-        internal static bool TryTranslateRpcException(Exception possibleRpcException, out SpannerException spannerException)
+        internal static bool TryTranslateRpcException(Exception possibleRpcException,
+            out SpannerException spannerException)
         {
             spannerException = possibleRpcException as SpannerException;
             RpcException rpcException = possibleRpcException as RpcException;
@@ -60,7 +61,7 @@ namespace Google.Cloud.Spanner
             AggregateException aggregateException = possibleRpcException as AggregateException;
             if (aggregateException?.InnerExceptions != null)
             {
-                spannerException = (SpannerException)aggregateException.InnerExceptions
+                spannerException = (SpannerException) aggregateException.InnerExceptions
                     .FirstOrDefault(x => x is SpannerException);
             }
 
@@ -151,7 +152,8 @@ namespace Google.Cloud.Spanner
                 case ErrorCode.ResourceExhausted:
                     return "Resources have been exhausted.";
                 case ErrorCode.FailedPrecondition:
-                    return "Operation was rejected because the system is not in a state required for the operation's execution.";
+                    return
+                        "Operation was rejected because the system is not in a state required for the operation's execution.";
                 case ErrorCode.Aborted:
                     return "The operation was aborted.";
                 case ErrorCode.OutOfRange:

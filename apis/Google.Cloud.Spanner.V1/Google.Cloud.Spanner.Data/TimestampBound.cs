@@ -42,8 +42,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static TimestampBound OfMaxStaleness(TimeSpan duration)
         {
-            return new TimestampBound
-            {
+            return new TimestampBound {
                 Mode = TimestampBoundMode.MaxStaleness,
                 Staleness = duration
             };
@@ -55,8 +54,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static TimestampBound OfMinReadTimestamp(DateTime timestamp)
         {
-            return new TimestampBound
-            {
+            return new TimestampBound {
                 Mode = TimestampBoundMode.MinReadTimestamp,
                 TimeStamp = timestamp
             };
@@ -68,8 +66,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static TimestampBound OfReadTimestamp(DateTime timestamp)
         {
-            return new TimestampBound
-            {
+            return new TimestampBound {
                 Mode = TimestampBoundMode.ReadTimestamp,
                 TimeStamp = timestamp
             };

@@ -9,18 +9,22 @@
         /// 
         /// </summary>
         Debug = 0,
+
         /// <summary>
         /// 
         /// </summary>
         Info = 1,
+
         /// <summary>
         /// 
         /// </summary>
         Warn = 2,
+
         /// <summary>
         /// 
         /// </summary>
         Error = 3,
+
         /// <summary>
         /// 
         /// </summary>

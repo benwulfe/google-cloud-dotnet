@@ -54,6 +54,7 @@ namespace Google.Cloud.Spanner
 #if NET45 || NET451
         private VolatileResourceManager _volatileResourceManager;
 #endif
+
         /// <summary>
         ///     Creates a SpannerConnection with no datasource or credential specified.
         /// </summary>
@@ -144,7 +145,8 @@ namespace Google.Cloud.Spanner
             return BeginReadOnlyTransactionAsync(TimestampBound.Strong, cancellationToken);
         }
 
-        private Task<SpannerTransaction> BeginTransactionImpl(CancellationToken cancellationToken, TransactionOptions transactionOptions, 
+        private Task<SpannerTransaction> BeginTransactionImpl(CancellationToken cancellationToken,
+            TransactionOptions transactionOptions,
             TransactionMode transactionMode)
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
@@ -166,7 +168,7 @@ namespace Google.Cloud.Spanner
         /// <param name="targetReadTimeStamp"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public Task<SpannerTransaction> BeginReadOnlyTransactionAsync(TimestampBound targetReadTimeStamp, 
+        public Task<SpannerTransaction> BeginReadOnlyTransactionAsync(TimestampBound targetReadTimeStamp,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             TransactionOptions.Types.ReadOnly readOnlyOptions;
@@ -176,16 +178,25 @@ namespace Google.Cloud.Spanner
                     readOnlyOptions = new TransactionOptions.Types.ReadOnly {Strong = true};
                     break;
                 case TimestampBoundMode.ReadTimestamp:
-                    readOnlyOptions = new TransactionOptions.Types.ReadOnly { ReadTimestamp = Timestamp.FromDateTime(targetReadTimeStamp.TimeStamp) };
+                    readOnlyOptions = new TransactionOptions.Types.ReadOnly {
+                        ReadTimestamp = Timestamp.FromDateTime(targetReadTimeStamp.TimeStamp)
+                    };
                     break;
                 case TimestampBoundMode.MinReadTimestamp:
-                    readOnlyOptions = new TransactionOptions.Types.ReadOnly { MinReadTimestamp = Timestamp.FromDateTime(targetReadTimeStamp.TimeStamp) };
+                    readOnlyOptions = new TransactionOptions.Types.ReadOnly {
+                        MinReadTimestamp = Timestamp.FromDateTime(targetReadTimeStamp.TimeStamp)
+                    };
                     break;
                 case TimestampBoundMode.ExactStaleness:
-                    readOnlyOptions = new TransactionOptions.Types.ReadOnly { ExactStaleness = Duration.FromTimeSpan(targetReadTimeStamp.Staleness) };
+                    readOnlyOptions = new TransactionOptions.Types.ReadOnly {
+                        ExactStaleness = Duration.FromTimeSpan(targetReadTimeStamp.Staleness)
+                    };
                     break;
                 case TimestampBoundMode.MaxStaleness:
-                    readOnlyOptions = new TransactionOptions.Types.ReadOnly { MaxStaleness = Duration.FromTimeSpan(targetReadTimeStamp.Staleness) };
+                    readOnlyOptions =
+                        new TransactionOptions.Types.ReadOnly {
+                            MaxStaleness = Duration.FromTimeSpan(targetReadTimeStamp.Staleness)
+                        };
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -202,7 +213,6 @@ namespace Google.Cloud.Spanner
         public Task<SpannerTransaction> BeginTransactionAsync(
             CancellationToken cancellationToken = default(CancellationToken))
         {
-
             return BeginTransactionImpl(cancellationToken, new TransactionOptions {
                 ReadWrite = new TransactionOptions.Types.ReadWrite()
             }, TransactionMode.ReadWrite);
@@ -361,7 +371,8 @@ namespace Google.Cloud.Spanner
                         .ConfigureAwait(false);
                     _sessionRefCount = 0;
                     _keepAliveCancellation = new CancellationTokenSource();
-                    _keepAliveTask = Task.Run(() => KeepAlive(_keepAliveCancellation.Token), _keepAliveCancellation.Token);
+                    _keepAliveTask = Task.Run(() => KeepAlive(_keepAliveCancellation.Token),
+                        _keepAliveCancellation.Token);
                 }
                 finally
                 {
@@ -545,7 +556,6 @@ namespace Google.Cloud.Spanner
                             _connectionStringBuilder.Project, _connectionStringBuilder.SpannerInstance,
                             _connectionStringBuilder.SpannerDatabase, options, cancellationToken);
                     }
-
                 }
 
                 return result;
@@ -553,6 +563,7 @@ namespace Google.Cloud.Spanner
         }
 
         private CancellationTokenSource _keepAliveCancellation;
+
         // ReSharper disable once NotAccessedField.Local
         private Task _keepAliveTask;
 
@@ -560,14 +571,13 @@ namespace Google.Cloud.Spanner
 
         private async Task KeepAlive(CancellationToken cancellationToken)
         {
-            ExecuteSqlRequest request = new ExecuteSqlRequest
-            {
+            ExecuteSqlRequest request = new ExecuteSqlRequest {
                 Sql = "SELECT 1",
             };
 
             while (true)
             {
-                int waitTime = (int)ConnectionPoolOptions.KeepAliveIntervalMinutes.TotalMilliseconds;
+                int waitTime = (int) ConnectionPoolOptions.KeepAliveIntervalMinutes.TotalMilliseconds;
                 await Task.Delay(waitTime, cancellationToken);
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -605,12 +615,13 @@ namespace Google.Cloud.Spanner
                 _session = session;
             }
 
-            public static Task<SessionHolder> Allocate(SpannerConnection owner,  CancellationToken cancellationToken)
+            public static Task<SessionHolder> Allocate(SpannerConnection owner, CancellationToken cancellationToken)
             {
                 return Allocate(owner, s_defaultTransactionOptions, cancellationToken);
             }
 
-            public static async Task<SessionHolder> Allocate(SpannerConnection owner, TransactionOptions options, CancellationToken cancellationToken)
+            public static async Task<SessionHolder> Allocate(SpannerConnection owner, TransactionOptions options,
+                CancellationToken cancellationToken)
             {
                 var session = await owner.AllocateSession(options, cancellationToken).ConfigureAwait(false);
                 return new SessionHolder(owner, session);
@@ -622,6 +633,7 @@ namespace Google.Cloud.Spanner
             {
                 return Interlocked.Exchange(ref _session, null);
             }
+
             public void Dispose()
             {
                 var session = Interlocked.Exchange(ref _session, null);
@@ -631,6 +643,7 @@ namespace Google.Cloud.Spanner
                 }
             }
         }
+
         internal SpannerClient SpannerClient => _client;
 
 #if NET45 || NET451

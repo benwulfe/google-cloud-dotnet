@@ -73,10 +73,7 @@ namespace Google.Cloud.Spanner
         public override ParameterDirection Direction
         {
             get { return _direction; }
-            set
-            {
-                throw new InvalidOperationException("Spanner does not support anything except input parameters.");
-            }
+            set { throw new InvalidOperationException("Spanner does not support anything except input parameters."); }
         }
 
         /// <inheritdoc />
@@ -115,7 +112,7 @@ namespace Google.Cloud.Spanner
 
 #endif
 
-        internal V1.TypeCode TypeCode =>  _spannerTypeCode;
+        internal V1.TypeCode TypeCode => _spannerTypeCode;
 
         /// <summary>
         /// </summary>
@@ -133,7 +130,8 @@ namespace Google.Cloud.Spanner
             {
                 if (_spannerTypeCode == TypeCode.Unspecified)
                 {
-                    throw new ArgumentException("SpannerDbType must be set to one of (Bool, Int64, Float64, Timestamp, Date, String, Bytes)");
+                    throw new ArgumentException(
+                        "SpannerDbType must be set to one of (Bool, Int64, Float64, Timestamp, Date, String, Bytes)");
                 }
                 _value = value;
             }
@@ -142,7 +140,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public object Clone()
         {
-            return (SpannerParameter)MemberwiseClone();
+            return (SpannerParameter) MemberwiseClone();
         }
 
         /// <inheritdoc />

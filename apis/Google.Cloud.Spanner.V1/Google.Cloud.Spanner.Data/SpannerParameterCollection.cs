@@ -48,7 +48,7 @@ namespace Google.Cloud.Spanner
         /// <param name="dbType"></param>
         public void Add(string parameterName, object value, SpannerDbType dbType)
         {
-            InnerList.Add(new SpannerParameter(parameterName, dbType) { Value = value});
+            InnerList.Add(new SpannerParameter(parameterName, dbType) {Value = value});
         }
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override int Add(object value)
         {
-            InnerList.Add((SpannerParameter)value);
+            InnerList.Add((SpannerParameter) value);
             return InnerList.Count - 1;
         }
 
@@ -111,7 +111,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override int IndexOf(object value)
         {
-           return InnerList.IndexOf(value as SpannerParameter);
+            return InnerList.IndexOf(value as SpannerParameter);
         }
 
         /// <inheritdoc />
@@ -123,13 +123,13 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void Insert(int index, object value)
         {
-            InnerList.Insert(index, (SpannerParameter)value);
+            InnerList.Insert(index, (SpannerParameter) value);
         }
 
         /// <inheritdoc />
         public override void Remove(object value)
         {
-            InnerList.Remove((SpannerParameter)value);
+            InnerList.Remove((SpannerParameter) value);
         }
 
         /// <inheritdoc />

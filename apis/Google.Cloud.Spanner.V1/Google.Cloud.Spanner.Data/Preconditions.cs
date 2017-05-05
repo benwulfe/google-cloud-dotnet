@@ -6,7 +6,6 @@ using Google.Cloud.Spanner.V1;
 
 namespace Google.Cloud.Spanner
 {
-
     internal static class Preconditions
     {
         public static void AssertOneOf(this object argument, string nameofArg, params object[] values)
@@ -18,7 +17,7 @@ namespace Google.Cloud.Spanner
         {
             if (values == null || !values.Any(x => Equals(argument, x)))
             {
-                throw new ArgumentException( $"Invalid value for {nameofArg}. {detail}");
+                throw new ArgumentException($"Invalid value for {nameofArg}. {detail}");
             }
         }
 

@@ -50,7 +50,7 @@ namespace Google.Cloud.Spanner
             key = key.ToLower();
             if (ContainsKey(key))
             {
-                return (string)this[key];
+                return (string) this[key];
             }
             return defaultValue;
         }
@@ -91,7 +91,7 @@ namespace Google.Cloud.Spanner
         /// </summary>
         public string Host
         {
-            get { return  GetValueOrDefault(nameof(Host), SpannerClient.DefaultEndpoint.Host); }
+            get { return GetValueOrDefault(nameof(Host), SpannerClient.DefaultEndpoint.Host); }
             private set { this[nameof(Host)] = value; }
         }
 
@@ -145,13 +145,14 @@ namespace Google.Cloud.Spanner
                     return
                         await
                             GoogleWebAuthorizationBroker.AuthorizeAsync(
-                                new ClientSecrets {
-                                    ClientId = clientId,
-                                    ClientSecret = clientSecret
-                                },
-                                SpannerClient.DefaultScopes,
-                                "user",
-                                CancellationToken.None).ConfigureAwait(false);
+                                    new ClientSecrets {
+                                        ClientId = clientId,
+                                        ClientSecret = clientSecret
+                                    },
+                                    SpannerClient.DefaultScopes,
+                                    "user",
+                                    CancellationToken.None)
+                                .ConfigureAwait(false);
             }
             return null;
         }

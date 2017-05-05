@@ -9,7 +9,6 @@ namespace Google.Cloud.Spanner
 {
     internal static class ExecuteHelper
     {
-
         internal static void WithErrorTranslationAndProfiling(Action t, string name)
         {
             try
