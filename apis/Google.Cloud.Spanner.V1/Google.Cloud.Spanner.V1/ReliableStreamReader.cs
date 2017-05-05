@@ -252,7 +252,7 @@ namespace Google.Cloud.Spanner.V1
     /// <summary>
     /// 
     /// </summary>
-    public class StreamClosedEventArgs : EventArgs
+    public sealed class StreamClosedEventArgs : EventArgs
     {
     }
 }

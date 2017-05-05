@@ -21,7 +21,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Spanner.V1;
 using Google.Cloud.Spanner.V1.Logging;
 using Google.Protobuf.WellKnownTypes;
-
+using TransactionOptions = Google.Cloud.Spanner.V1.TransactionOptions;
 #if NET45 || NET451
 using Transaction = System.Transactions.Transaction;
 
@@ -51,7 +51,9 @@ namespace Google.Cloud.Spanner
         private int _sessionRefCount;
         private ConnectionState _state = ConnectionState.Closed;
         private readonly object _sync = new object();
-
+#if NET45 || NET451
+        private VolatileResourceManager _volatileResourceManager;
+#endif
         /// <summary>
         ///     Creates a SpannerConnection with no datasource or credential specified.
         /// </summary>
@@ -209,6 +211,10 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void ChangeDatabase(string newDataSource)
         {
+            if (IsOpen)
+            {
+                Close();
+            }
             TrySetNewConnectionInfo(_connectionStringBuilder.CloneWithNewDataSource(newDataSource));
         }
 
@@ -221,6 +227,9 @@ namespace Google.Cloud.Spanner
             {
                 if (IsClosed) return;
                 _keepAliveCancellation?.Cancel();
+#if NET45 || NET451
+                _volatileResourceManager = null;
+#endif
                 primarySessionInUse = _sessionRefCount > 0;
                 _state = ConnectionState.Closed;
                 //we do not await the actual session close, we let that happen async.
@@ -302,6 +311,29 @@ namespace Google.Cloud.Spanner
             OpenAsync(CancellationToken.None).Wait();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="timestampBound"></param>
+        /// <returns></returns>
+        public void OpenWithTimeBoundSettings(TimestampBound timestampBound)
+        {
+            _timestampBound = timestampBound;
+            Open();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="timestampBound"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public Task OpenWithTimeBoundSettingsAsync(TimestampBound timestampBound, CancellationToken cancellationToken)
+        {
+            _timestampBound = timestampBound;
+            return OpenAsync(cancellationToken);
+        }
+
         /// <inheritdoc />
         public override Task OpenAsync(CancellationToken cancellationToken)
         {
@@ -334,6 +366,13 @@ namespace Google.Cloud.Spanner
                 finally
                 {
                     _state = _sharedSession != null ? ConnectionState.Open : ConnectionState.Broken;
+#if NET45 || NET451
+                    if (IsOpen && Transaction.Current != null)
+                    {
+                        //we auto enlist in transaction.current.
+                        EnlistTransaction(Transaction.Current);
+                    }
+#endif
                 }
             }, "SpannerConnection.OpenAsync");
         }
@@ -375,6 +414,16 @@ namespace Google.Cloud.Spanner
             _connectionStringBuilder = newBuilder;
         }
 
+        internal ISpannerTransaction GetDefaultTransaction()
+        {
+#if NET45 || NET451
+            if (_volatileResourceManager != null)
+            {
+                return _volatileResourceManager;
+            }
+#endif
+            return new EphemeralTransaction(this);
+        }
 
         internal void ReleaseSession(Session session)
         {
@@ -504,7 +553,10 @@ namespace Google.Cloud.Spanner
         }
 
         private CancellationTokenSource _keepAliveCancellation;
+        // ReSharper disable once NotAccessedField.Local
         private Task _keepAliveTask;
+
+        private TimestampBound _timestampBound;
 
         private async Task KeepAlive(CancellationToken cancellationToken)
         {
@@ -583,10 +635,21 @@ namespace Google.Cloud.Spanner
 
 #if NET45 || NET451
 
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool EnlistInTransaction { get; set; } = true;
+
         /// <inheritdoc />
         public override void EnlistTransaction(Transaction transaction)
         {
-            throw new NotImplementedException();
+            if (!EnlistInTransaction) return;
+            if (_volatileResourceManager != null)
+            {
+                throw new InvalidOperationException("This connection is already enlisted to a transaction.");
+            }
+            _volatileResourceManager = new VolatileResourceManager(this, _timestampBound);
+            transaction.EnlistVolatile(_volatileResourceManager, System.Transactions.EnlistmentOptions.None);
         }
 
         /// <inheritdoc />

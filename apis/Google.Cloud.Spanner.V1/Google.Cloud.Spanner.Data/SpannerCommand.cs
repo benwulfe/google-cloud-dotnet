@@ -109,16 +109,13 @@ namespace Google.Cloud.Spanner
         /// </summary>
         public new SpannerParameterCollection Parameters { get; private set; }
 
-        internal ISpannerTransaction SpannerTransactionImpl
+        internal ISpannerTransaction GetSpannerTransaction()
         {
-            get
+            if (_transaction != null)
             {
-                if (_transaction != null)
-                {
-                    return _transaction;
-                }
-                return new EphemeralTransaction(SpannerConnection);
+                return _transaction;
             }
+            return SpannerConnection.GetDefaultTransaction();
         }
 
         /// <summary>
@@ -244,7 +241,7 @@ namespace Google.Cloud.Spanner
             }
 
             // Execute the command.
-            var resultset = await SpannerTransactionImpl.ExecuteQueryAsync(CommandText, cancellationToken).ConfigureAwait(false);
+            var resultset = await GetSpannerTransaction().ExecuteQueryAsync(CommandText, cancellationToken).ConfigureAwait(false);
 
             if ((behavior & CommandBehavior.CloseConnection) == CommandBehavior.CloseConnection)
                 return new SpannerDataReader(resultset, SpannerConnection);
@@ -333,7 +330,7 @@ namespace Google.Cloud.Spanner
             }
 
             // Make the request.  This will commit immediately or not depending on whether a transaction was explicitly created.
-            await SpannerTransactionImpl.ExecuteMutationsAsync(mutations, cancellationToken).ConfigureAwait(false);
+            await GetSpannerTransaction().ExecuteMutationsAsync(mutations, cancellationToken).ConfigureAwait(false);
 
             // Return the number of records affected.
             return mutations.Count;
