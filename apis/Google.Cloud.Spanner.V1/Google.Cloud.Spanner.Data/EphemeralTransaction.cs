@@ -29,19 +29,24 @@ namespace Google.Cloud.Spanner
         /// <param name="mutations"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public async Task<int> ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
+        public Task<int> ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
         {
             mutations.AssertNotNull(nameof(mutations));
             Logger.Debug(() => "Executing a mutation change through an ephemeral transaction.");
             int count;
 
-            using (var transaction = await _connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+            return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
             {
-                count = await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken)
-                    .ConfigureAwait(false);
-                await transaction.CommitAsync().ConfigureAwait(false);
-            }
-            return count;
+                using (var transaction = await _connection.BeginTransactionAsync(cancellationToken)
+                    .ConfigureAwait(false))
+                {
+                    count = await ((ISpannerTransaction) transaction)
+                        .ExecuteMutationsAsync(mutations, cancellationToken)
+                        .ConfigureAwait(false);
+                    await transaction.CommitAsync().ConfigureAwait(false);
+                }
+                return count;
+            }, "EphemeralTransaction.ExecuteMutations");
         }
 
         public Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
@@ -63,7 +68,7 @@ namespace Google.Cloud.Spanner
 
                     return streamReader;
                 }
-            }, "Transaction.ExecuteQuery");
+            }, "EphemeralTransaction.ExecuteQuery");
         }
     }
 }

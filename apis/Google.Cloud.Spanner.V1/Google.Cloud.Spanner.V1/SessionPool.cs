@@ -46,13 +46,13 @@ namespace Google.Cloud.Spanner.V1
 #if NET45
             AppDomain.CurrentDomain.DomainUnload += (sender, args) =>
             {
-                ReleaseAll().Wait(s_shutDownTimer);
+                Task.Run(ReleaseAll).Wait(s_shutDownTimer);
             };
 #endif
 #if NETSTANDARD1_5
             System.Runtime.Loader.AssemblyLoadContext.Default.Unloading += context =>
             {
-                ReleaseAll().Wait(s_shutDownTimer);
+                Task.Run(ReleaseAll).Wait(s_shutDownTimer);
             };
 #endif
         }

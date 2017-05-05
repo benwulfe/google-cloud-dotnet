@@ -90,7 +90,10 @@ namespace Google.Cloud.Spanner
             {
                 singlePhaseEnlistment.InDoubt(e);
             }
-            Dispose();
+            finally
+            {
+                Dispose();
+            }
         }
 
         public async Task<int> ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)

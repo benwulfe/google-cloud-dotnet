@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Cloud.Spanner.V1;
@@ -77,7 +78,10 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void Commit()
         {
-            CommitAsync().Wait();
+            if (!Task.Run(CommitAsync).Wait(ConnectionPoolOptions.Instance.TimeoutMilliseconds))
+            {
+                throw new SpannerException(ErrorCode.DeadlineExceeded, "The Commit did not complete in time.");
+            }
         }
 
         /// <summary>
@@ -98,7 +102,10 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void Rollback()
         {
-            RollbackAsync().Wait();
+            if (!Task.Run(RollbackAsync).Wait(ConnectionPoolOptions.Instance.TimeoutMilliseconds))
+            {
+                throw new SpannerException(ErrorCode.DeadlineExceeded, "The Rollback did not complete in time.");
+            }
         }
 
         /// <summary>
@@ -143,12 +150,15 @@ namespace Google.Cloud.Spanner
         {
             mutations.AssertNotNull(nameof(mutations));
             CheckCompatibleMode(TransactionMode.ReadWrite);
+            return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
+            {
 
-            TaskCompletionSource<int> taskCompletionSource = new TaskCompletionSource<int>();
-            cancellationToken.ThrowIfCancellationRequested();
-            _mutations.AddRange(mutations);
-            taskCompletionSource.SetResult(mutations.Count);
-            return taskCompletionSource.Task;
+                TaskCompletionSource<int> taskCompletionSource = new TaskCompletionSource<int>();
+                cancellationToken.ThrowIfCancellationRequested();
+                _mutations.AddRange(mutations);
+                taskCompletionSource.SetResult(mutations.Count);
+                return taskCompletionSource.Task;
+            }, "SpannerTransaction.ExecuteMutations");
         }
 
         Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(string sql,

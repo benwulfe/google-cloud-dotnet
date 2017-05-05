@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 
 namespace Google.Cloud.Spanner.V1.Logging
 {
@@ -62,8 +61,8 @@ namespace Google.Cloud.Spanner.V1.Logging
         /// </summary>
         /// <param name="name"></param>
         /// <param name="valueFunc"></param>
-        /// <param name="shouldResetOnLog"></param>
-        public abstract void LogPerformanceCounter(string name, Func<double, double> valueFunc, bool shouldResetOnLog);
+        /// 
+        public abstract void LogPerformanceCounter(string name, Func<double, double> valueFunc);
 
         /// <summary>
         /// 
@@ -79,6 +78,11 @@ namespace Google.Cloud.Spanner.V1.Logging
         /// 
         /// </summary>
         public static int PerformanceTraceLogInterval { get; set; } = 30000;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public static bool ResetPerformanceTracesEachInterval { get; set; } = true;
 
         internal static void Debug(Func<string> messageFunc)
         {
@@ -116,7 +120,7 @@ namespace Google.Cloud.Spanner.V1.Logging
         {
             if (LogPerformanceTraces)
             {
-                Instance.LogPerformanceCounter(name, x => valueFunc(), false);
+                Instance.LogPerformanceCounter(name, x => valueFunc());
             }
         }
 
@@ -124,7 +128,7 @@ namespace Google.Cloud.Spanner.V1.Logging
         {
             if (LogPerformanceTraces)
             {
-                Instance.LogPerformanceCounter(name, valueFunc, true);
+                Instance.LogPerformanceCounter(name, valueFunc);
             }
         }
     }

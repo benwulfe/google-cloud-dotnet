@@ -134,6 +134,15 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
+        /// 
+        /// </summary>
+        public bool ResetPerformanceTracesEachInterval
+        {
+            get { return V1.Logging.Logger.ResetPerformanceTracesEachInterval; }
+            set { V1.Logging.Logger.ResetPerformanceTracesEachInterval = value; }
+        }
+
+        /// <summary>
         /// </summary>
         public int TimeoutMilliseconds { get; set; } = 600000;
 

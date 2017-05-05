@@ -318,7 +318,7 @@ namespace Google.Cloud.Spanner
         {
             if (IsOpen)
                 return;
-            OpenAsync(CancellationToken.None).Wait();
+            Task.Run(OpenAsync).Wait(ConnectionPoolOptions.Instance.TimeoutMilliseconds);
         }
 
         /// <summary>
@@ -347,6 +347,10 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override Task OpenAsync(CancellationToken cancellationToken)
         {
+#if NET45 || NET451
+            var currentTransaction = Transaction.Current; //snap it on this thread.
+#endif
+
             return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
             {
                 if (IsOpen) return;
@@ -378,10 +382,10 @@ namespace Google.Cloud.Spanner
                 {
                     _state = _sharedSession != null ? ConnectionState.Open : ConnectionState.Broken;
 #if NET45 || NET451
-                    if (IsOpen && Transaction.Current != null)
+                    if (IsOpen && currentTransaction != null)
                     {
                         //we auto enlist in transaction.current.
-                        EnlistTransaction(Transaction.Current);
+                        EnlistTransaction(currentTransaction);
                     }
 #endif
                 }
@@ -569,35 +573,40 @@ namespace Google.Cloud.Spanner
 
         private TimestampBound _timestampBound;
 
-        private async Task KeepAlive(CancellationToken cancellationToken)
+        private Task KeepAlive(CancellationToken cancellationToken)
         {
             ExecuteSqlRequest request = new ExecuteSqlRequest {
                 Sql = "SELECT 1",
             };
 
-            while (true)
+            int waitTime = (int) ConnectionPoolOptions.KeepAliveIntervalMinutes.TotalMilliseconds;
+            var task = Task.Delay(waitTime, cancellationToken);
+            var loopTask = task.ContinueWith(async t => 
             {
-                int waitTime = (int) ConnectionPoolOptions.KeepAliveIntervalMinutes.TotalMilliseconds;
-                await Task.Delay(waitTime, cancellationToken);
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                Session sharedSession = _sharedSession;
-                if (sharedSession != null)
+                if (!cancellationToken.IsCancellationRequested)
                 {
-                    try
+                    //ping and reschedule.
+                    Session sharedSession = _sharedSession;
+                    if (sharedSession != null)
                     {
-                        request.SessionAsSessionName = sharedSession.SessionName;
-                        await _client.ExecuteSqlAsync(request);
+                        try
+                        {
+                            request.SessionAsSessionName = sharedSession.SessionName;
+                            await _client.ExecuteSqlAsync(request);
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.Warn(() => $"Exception attempting to keep session alive: {e}");
+                            return;
+                        }
                     }
-                    catch (Exception e)
-                    {
-                        Logger.Warn(() => $"Exception attempting to keep session alive: {e}");
-                        return;
-                    }
+
+                    _keepAliveTask = Task.Run(() => KeepAlive(_keepAliveCancellation.Token),
+                        _keepAliveCancellation.Token);
                 }
-            }
-            // ReSharper disable once FunctionNeverReturns
+            }, cancellationToken);
+
+            return loopTask;
         }
 
         /// <summary>

@@ -13,7 +13,6 @@ namespace Google.Cloud.Spanner
         {
             try
             {
-                Logger.LogPerformanceCounterFn($"{name}.Count", x => x + 1);
                 Stopwatch sw = null;
                 if (Logger.LogPerformanceTraces)
                 {
@@ -40,7 +39,6 @@ namespace Google.Cloud.Spanner
         {
             try
             {
-                Logger.LogPerformanceCounterFn($"{name}.Count", x => x + 1);
                 Stopwatch sw = null;
                 if (Logger.LogPerformanceTraces)
                 {
@@ -67,7 +65,6 @@ namespace Google.Cloud.Spanner
         {
             try
             {
-                Logger.LogPerformanceCounterFn($"{name}.Count", x => x + 1);
                 Stopwatch sw = null;
                 if (Logger.LogPerformanceTraces)
                 {
