@@ -283,8 +283,6 @@ namespace Google.Cloud.Spanner
             List<Mutation> mutations = new List<Mutation>();
             if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Delete)
             {
-//                for (int i = 0; i < 1000; i++)
-//                {
                 var w = new Mutation.Types.Write {Table = SpannerCommandTextBuilder.TargetTable};
                 //Parameters["ID"].Value = (long) Parameters["ID"].Value + 1;
                 w.Columns.AddRange(Parameters.Cast<SpannerParameter>()
@@ -312,7 +310,6 @@ namespace Google.Cloud.Spanner
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
-//                }
             }
             else
             {
