@@ -45,14 +45,23 @@ namespace Google.Cloud.Spanner
         // any session it obtains with others.
 
         private static readonly TransactionOptions s_defaultTransactionOptions = new TransactionOptions();
-
-        private SpannerClient _client;
-        private SpannerConnectionStringBuilder _connectionStringBuilder;
-        private Session _sharedSession;
-        private int _sessionRefCount;
-        private ConnectionState _state = ConnectionState.Closed;
         private readonly object _sync = new object();
+
+        private SpannerConnectionStringBuilder _connectionStringBuilder;
+
+        private CancellationTokenSource _keepAliveCancellation;
+
+        // ReSharper disable once NotAccessedField.Local
+        private Task _keepAliveTask;
+
+        private int _sessionRefCount;
+        private Session _sharedSession;
+
+        private volatile Task<Session> _sharedSessionAllocator;
+        private ConnectionState _state = ConnectionState.Closed;
         private readonly HashSet<string> _staleSessions = new HashSet<string>();
+
+        private TimestampBound _timestampBound;
 #if NET45 || NET451
         private VolatileResourceManager _volatileResourceManager;
 #endif
@@ -136,8 +145,9 @@ namespace Google.Cloud.Spanner
 
         internal bool IsOpen => (State & ConnectionState.Open) == ConnectionState.Open;
 
+        internal SpannerClient SpannerClient { get; private set; }
+
         /// <summary>
-        /// 
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
@@ -145,24 +155,6 @@ namespace Google.Cloud.Spanner
             CancellationToken cancellationToken = default(CancellationToken))
         {
             return BeginReadOnlyTransactionAsync(TimestampBound.Strong, cancellationToken);
-        }
-
-        private Task<SpannerTransaction> BeginTransactionImpl(CancellationToken cancellationToken,
-            TransactionOptions transactionOptions,
-            TransactionMode transactionMode)
-        {
-            return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
-            {
-                using (var sessionHolder = await SessionHolder.Allocate(this, transactionOptions, cancellationToken)
-                    .ConfigureAwait(false))
-                {
-                    var transaction = await SpannerClient
-                        .BeginPooledTransactionAsync(sessionHolder.Session, transactionOptions)
-                        .ConfigureAwait(false);
-                    return new SpannerTransaction(this, transactionMode, sessionHolder.TakeOwnership(),
-                        transaction);
-                }
-            }, "SpannerConnection.BeginTransaction");
         }
 
         /// <summary>
@@ -224,9 +216,7 @@ namespace Google.Cloud.Spanner
         public override void ChangeDatabase(string newDataSource)
         {
             if (IsOpen)
-            {
                 Close();
-            }
             TrySetNewConnectionInfo(_connectionStringBuilder.CloneWithNewDataSource(newDataSource));
         }
 
@@ -249,10 +239,7 @@ namespace Google.Cloud.Spanner
                 _sharedSession = null;
             }
             if (session != null && !primarySessionInUse)
-            {
-                //release the session if its not used.
                 SpannerClient.ReleaseToPool(session);
-            }
         }
 
         /// <summary>
@@ -323,29 +310,6 @@ namespace Google.Cloud.Spanner
             Task.Run(OpenAsync).Wait(ConnectionPoolOptions.Instance.TimeoutMilliseconds);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="timestampBound"></param>
-        /// <returns></returns>
-        public void OpenWithTimeBoundSettings(TimestampBound timestampBound)
-        {
-            _timestampBound = timestampBound;
-            Open();
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="timestampBound"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        public Task OpenWithTimeBoundSettingsAsync(TimestampBound timestampBound, CancellationToken cancellationToken)
-        {
-            _timestampBound = timestampBound;
-            return OpenAsync(cancellationToken);
-        }
-
         /// <inheritdoc />
         public override Task OpenAsync(CancellationToken cancellationToken)
         {
@@ -365,7 +329,7 @@ namespace Google.Cloud.Spanner
                 }
                 try
                 {
-                    _client = await ClientPool.AcquireClientAsync(_connectionStringBuilder.Credential,
+                    SpannerClient = await ClientPool.AcquireClientAsync(_connectionStringBuilder.Credential,
                             _connectionStringBuilder.EndPoint)
                         .ConfigureAwait(false);
                     _sharedSession = await SpannerClient.CreateSessionFromPoolAsync(
@@ -385,13 +349,31 @@ namespace Google.Cloud.Spanner
                     _state = _sharedSession != null ? ConnectionState.Open : ConnectionState.Broken;
 #if NET45 || NET451
                     if (IsOpen && currentTransaction != null)
-                    {
-                        //we auto enlist in transaction.current.
                         EnlistTransaction(currentTransaction);
-                    }
 #endif
                 }
             }, "SpannerConnection.OpenAsync");
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <param name="timestampBound"></param>
+        /// <returns></returns>
+        public void OpenWithTimeBoundSettings(TimestampBound timestampBound)
+        {
+            _timestampBound = timestampBound;
+            Open();
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <param name="timestampBound"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public Task OpenWithTimeBoundSettingsAsync(TimestampBound timestampBound, CancellationToken cancellationToken)
+        {
+            _timestampBound = timestampBound;
+            return OpenAsync(cancellationToken);
         }
 
         /// <inheritdoc />
@@ -413,31 +395,11 @@ namespace Google.Cloud.Spanner
             if (IsOpen) Close();
         }
 
-        private void AssertClosed(string message)
-        {
-            if (!IsClosed)
-                throw new InvalidOperationException("The connection must be closed.  Failed to " + message);
-        }
-
-        private void AssertOpen(string message)
-        {
-            if (!IsOpen)
-                throw new InvalidOperationException("The connection must be open.  Failed to " + message);
-        }
-
-        private void TrySetNewConnectionInfo(SpannerConnectionStringBuilder newBuilder)
-        {
-            AssertClosed("change connection information.");
-            _connectionStringBuilder = newBuilder;
-        }
-
         internal ISpannerTransaction GetDefaultTransaction()
         {
 #if NET45 || NET451
             if (_volatileResourceManager != null)
-            {
                 return _volatileResourceManager;
-            }
 #endif
             return new EphemeralTransaction(this);
         }
@@ -476,12 +438,8 @@ namespace Google.Cloud.Spanner
                 }
             }
             if (sessionToRelease != null)
-            {
                 SpannerClient.ReleaseToPool(sessionToRelease);
-            }
         }
-
-        private volatile Task<Session> _sharedSessionAllocator;
 
         private Task<Session> AllocateSession(TransactionOptions options, CancellationToken cancellationToken)
         {
@@ -508,7 +466,7 @@ namespace Google.Cloud.Spanner
                     //    we steal _sharedSession to return it, set _sharedSession = null
                     //d) options != s_defaultTransactionOptions && (_sharedSession == null || refcnt > 0)
                     //    we grab a new session from the pool.
-                    bool isSharedReadonlyTx = Equals(options, s_defaultTransactionOptions);
+                    var isSharedReadonlyTx = Equals(options, s_defaultTransactionOptions);
                     if (isSharedReadonlyTx && _sharedSession != null)
                     {
                         var taskSource = new TaskCompletionSource<Session>();
@@ -544,9 +502,7 @@ namespace Google.Cloud.Spanner
                             _sharedSessionAllocator.ContinueWith(t =>
                             {
                                 if (t.IsCompleted)
-                                {
                                     Interlocked.Increment(ref _sessionRefCount);
-                                }
                             }, CancellationToken.None);
                         }
                         result = _sharedSessionAllocator;
@@ -581,39 +537,60 @@ namespace Google.Cloud.Spanner
             }, "SpannerConnection.AllocateSession");
         }
 
-        private CancellationTokenSource _keepAliveCancellation;
+        private void AssertClosed(string message)
+        {
+            if (!IsClosed)
+                throw new InvalidOperationException("The connection must be closed.  Failed to " + message);
+        }
 
-        // ReSharper disable once NotAccessedField.Local
-        private Task _keepAliveTask;
+        private void AssertOpen(string message)
+        {
+            if (!IsOpen)
+                throw new InvalidOperationException("The connection must be open.  Failed to " + message);
+        }
 
-        private TimestampBound _timestampBound;
+        private Task<SpannerTransaction> BeginTransactionImpl(CancellationToken cancellationToken,
+            TransactionOptions transactionOptions,
+            TransactionMode transactionMode)
+        {
+            return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
+            {
+                using (var sessionHolder = await SessionHolder.Allocate(this, transactionOptions, cancellationToken)
+                    .ConfigureAwait(false))
+                {
+                    var transaction = await SpannerClient
+                        .BeginPooledTransactionAsync(sessionHolder.Session, transactionOptions)
+                        .ConfigureAwait(false);
+                    return new SpannerTransaction(this, transactionMode, sessionHolder.TakeOwnership(),
+                        transaction);
+                }
+            }, "SpannerConnection.BeginTransaction");
+        }
 
         private Task KeepAlive(CancellationToken cancellationToken)
         {
-            ExecuteSqlRequest request = new ExecuteSqlRequest {
-                Sql = "SELECT 1",
+            var request = new ExecuteSqlRequest {
+                Sql = "SELECT 1"
             };
 
             var waitTime = (int) ConnectionPoolOptions.KeepAliveTimeSpan.TotalMilliseconds;
             var task = Task.Delay(waitTime, cancellationToken);
-            var loopTask = task.ContinueWith(async t => 
+            var loopTask = task.ContinueWith(async t =>
             {
                 if (!cancellationToken.IsCancellationRequested)
                 {
                     //ping and reschedule.
-                    Session sharedSession = _sharedSession;
+                    var sharedSession = _sharedSession;
                     if (sharedSession != null)
-                    {
                         try
                         {
-                            request.SessionAsSessionName = sharedSession.GetSessionName();
-                            await _client.ExecuteSqlAsync(request).WithSessionChecking(() => sharedSession);
+                            request.SessionAsSessionName = sharedSession.SessionName;
+                            await SpannerClient.ExecuteSqlAsync(request).WithSessionChecking(() => sharedSession);
                         }
                         catch (Exception e)
                         {
                             Logger.Warn(() => $"Exception attempting to keep session alive: {e}");
                         }
-                    }
 
                     _keepAliveTask = Task.Run(() => KeepAlive(_keepAliveCancellation.Token),
                         _keepAliveCancellation.Token);
@@ -623,9 +600,15 @@ namespace Google.Cloud.Spanner
             return loopTask;
         }
 
+        private void TrySetNewConnectionInfo(SpannerConnectionStringBuilder newBuilder)
+        {
+            AssertClosed("change connection information.");
+            _connectionStringBuilder = newBuilder;
+        }
+
         /// <summary>
-        /// SessionHolder is a helper class to ensure that sessions do not leak and are properly recycled when
-        /// an error occurs.
+        ///     SessionHolder is a helper class to ensure that sessions do not leak and are properly recycled when
+        ///     an error occurs.
         /// </summary>
         internal sealed class SessionHolder : IDisposable
         {
@@ -636,6 +619,15 @@ namespace Google.Cloud.Spanner
             {
                 _connection = connection;
                 _session = session;
+            }
+
+            public Session Session => _session;
+
+            public void Dispose()
+            {
+                var session = Interlocked.Exchange(ref _session, null);
+                if (session != null)
+                    _connection.ReleaseSession(session);
             }
 
             public static Task<SessionHolder> Allocate(SpannerConnection owner, CancellationToken cancellationToken)
@@ -650,29 +642,15 @@ namespace Google.Cloud.Spanner
                 return new SessionHolder(owner, session);
             }
 
-            public Session Session => _session;
-
             public Session TakeOwnership()
             {
                 return Interlocked.Exchange(ref _session, null);
             }
-
-            public void Dispose()
-            {
-                var session = Interlocked.Exchange(ref _session, null);
-                if (session != null)
-                {
-                    _connection.ReleaseSession(session);
-                }
-            }
         }
-
-        internal SpannerClient SpannerClient => _client;
 
 #if NET45 || NET451
 
         /// <summary>
-        /// 
         /// </summary>
         public bool EnlistInTransaction { get; set; } = true;
 
@@ -681,11 +659,9 @@ namespace Google.Cloud.Spanner
         {
             if (!EnlistInTransaction) return;
             if (_volatileResourceManager != null)
-            {
                 throw new InvalidOperationException("This connection is already enlisted to a transaction.");
-            }
             _volatileResourceManager = new VolatileResourceManager(this, _timestampBound);
-            transaction.EnlistVolatile(_volatileResourceManager, System.Transactions.EnlistmentOptions.None);
+            transaction.EnlistVolatile(_volatileResourceManager, EnlistmentOptions.None);
         }
 
         /// <inheritdoc />

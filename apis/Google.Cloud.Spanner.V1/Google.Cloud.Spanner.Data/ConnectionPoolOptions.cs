@@ -14,6 +14,7 @@
 
 using System;
 using Google.Cloud.Spanner.V1;
+using Google.Cloud.Spanner.V1.Logging;
 
 namespace Google.Cloud.Spanner
 {
@@ -66,16 +67,20 @@ namespace Google.Cloud.Spanner
             }
             set { SessionPool.WaitOnResourcesExhausted = value == ResourcesExhaustedBehavior.Block; }
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
         public TimeSpan KeepAliveTimeSpan { get; set; } = TimeSpan.FromMinutes(55);
 
         /// <summary>
-        /// Sets the log level for diagnostic logs sent to Trace (for desktop) or stderr (for .Net Core).
+        ///     Sets the log level for diagnostic logs sent to Trace (for desktop) or stderr (for .Net Core).
         /// </summary>
         public LogLevel LogLevel
         {
             get
             {
-                switch (V1.Logging.Logger.LogLevel)
+                switch (Logger.LogLevel)
                 {
                     case V1.Logging.LogLevel.Debug:
                         return LogLevel.Debug;
@@ -96,19 +101,19 @@ namespace Google.Cloud.Spanner
                 switch (value)
                 {
                     case LogLevel.Debug:
-                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Debug;
+                        Logger.LogLevel = V1.Logging.LogLevel.Debug;
                         break;
                     case LogLevel.Info:
-                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Info;
+                        Logger.LogLevel = V1.Logging.LogLevel.Info;
                         break;
                     case LogLevel.Warn:
-                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Warn;
+                        Logger.LogLevel = V1.Logging.LogLevel.Warn;
                         break;
                     case LogLevel.Error:
-                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.Error;
+                        Logger.LogLevel = V1.Logging.LogLevel.Error;
                         break;
                     case LogLevel.None:
-                        V1.Logging.Logger.LogLevel = V1.Logging.LogLevel.None;
+                        Logger.LogLevel = V1.Logging.LogLevel.None;
                         break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(value), value, null);
@@ -117,30 +122,28 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
-        /// 
         /// </summary>
         public bool LogPerformanceTraces
         {
-            get { return V1.Logging.Logger.LogPerformanceTraces; }
-            set { V1.Logging.Logger.LogPerformanceTraces = value; }
+            get { return Logger.LogPerformanceTraces; }
+            set { Logger.LogPerformanceTraces = value; }
         }
 
         /// <summary>
-        /// 
         /// </summary>
         public int PerformanceTraceLogInterval
         {
-            get { return V1.Logging.Logger.PerformanceTraceLogInterval; }
-            set { V1.Logging.Logger.PerformanceTraceLogInterval = value; }
+            get { return Logger.PerformanceTraceLogInterval; }
+            set { Logger.PerformanceTraceLogInterval = value; }
         }
 
+
         /// <summary>
-        /// 
         /// </summary>
         public bool ResetPerformanceTracesEachInterval
         {
-            get { return V1.Logging.Logger.ResetPerformanceTracesEachInterval; }
-            set { V1.Logging.Logger.ResetPerformanceTracesEachInterval = value; }
+            get { return Logger.ResetPerformanceTracesEachInterval; }
+            set { Logger.ResetPerformanceTracesEachInterval = value; }
         }
 
         /// <summary>

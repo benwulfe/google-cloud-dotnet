@@ -24,13 +24,13 @@ namespace Google.Cloud.Spanner
     /// </summary>
     public sealed class SpannerParameterCollection : DbParameterCollection
     {
-        private List<SpannerParameter> InnerList { get; } = new List<SpannerParameter>();
-
         /// <inheritdoc />
         public override int Count => InnerList.Count;
 
         /// <inheritdoc />
         public override object SyncRoot => InnerList;
+
+        private List<SpannerParameter> InnerList { get; } = new List<SpannerParameter>();
 
         /// <summary>
         /// </summary>
@@ -155,9 +155,7 @@ namespace Google.Cloud.Spanner
         {
             var index = IndexOf(parameterName);
             if (index == -1)
-            {
                 return null;
-            }
             return InnerList[index];
         }
 
@@ -172,13 +170,9 @@ namespace Google.Cloud.Spanner
         {
             var index = IndexOf(parameterName);
             if (index == -1)
-            {
                 InnerList.Add((SpannerParameter) value);
-            }
             else
-            {
                 InnerList[index] = (SpannerParameter) value;
-            }
         }
     }
 }
