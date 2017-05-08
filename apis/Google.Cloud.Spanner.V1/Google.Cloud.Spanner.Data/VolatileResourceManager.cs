@@ -57,13 +57,22 @@ namespace Google.Cloud.Spanner
 
         public void Rollback(Enlistment enlistment)
         {
-            Logger.Warn(
-                () =>
-                    "Got a Rollback call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
-            throw new NotSupportedException("Spanner only supports single phase commit (Rollback not supported)."
-                                            +
-                                            " This error can happen when attempting to use multiple transaction resources but may also happen for"
-                                            + " other reasons that cause a Transaction to use two-phase commit.");
+            try
+            {
+                ExecuteHelper.WithErrorTranslationAndProfiling(() =>
+                    _transaction?.Rollback(), "VolatileResourceManager.Rollback");
+                enlistment.Done();
+            }
+            catch (Exception e)
+            {
+                Logger.Error(
+                    () =>
+                        "Error attempting to rollback a transaction.", e);
+            }
+            finally
+            {
+                Dispose();
+            }
         }
 
         public void InDoubt(Enlistment enlistment)

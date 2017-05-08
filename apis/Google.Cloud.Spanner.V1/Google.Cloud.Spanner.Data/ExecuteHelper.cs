@@ -44,7 +44,7 @@ namespace Google.Cloud.Spanner
                 {
                     sw = Stopwatch.StartNew();
                 }
-                await t();
+                await t().ConfigureAwait(false);
                 if (sw != null)
                 {
                     Logger.LogPerformanceCounterFn($"{name}.Duration", x => sw.ElapsedMilliseconds);
@@ -80,7 +80,7 @@ namespace Google.Cloud.Spanner
             catch (Exception e)
             {
                 SpannerException translatedException;
-                if (SpannerException.TryTranslateRpcException(e, out translatedException))
+                if (!(e is SpannerException) && SpannerException.TryTranslateRpcException(e, out translatedException))
                 {
                     throw translatedException;
                 }

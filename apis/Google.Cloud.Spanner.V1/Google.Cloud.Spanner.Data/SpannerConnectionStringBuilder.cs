@@ -13,8 +13,6 @@
 // limitations under the License.
 
 using System.Data.Common;
-using System.Threading;
-using System.Threading.Tasks;
 using Google.Api.Gax.Grpc;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Util;
@@ -57,29 +55,13 @@ namespace Google.Cloud.Spanner
 
         /// <summary>
         /// </summary>
-        public string ClientId
-        {
-            get { return (string) GetValueOrDefault(nameof(ClientId)); }
-            private set { this[nameof(ClientId)] = value; }
-        }
-
-        /// <summary>
-        /// </summary>
-        public string ClientSecret
-        {
-            get { return (string) GetValueOrDefault(nameof(ClientSecret)); }
-            private set { this[nameof(ClientSecret)] = value; }
-        }
-
-        /// <summary>
-        /// </summary>
         public ITokenAccess Credential { get; private set; }
 
         /// <summary>
         /// </summary>
         public string DataSource
         {
-            get { return (string) GetValueOrDefault("Data Source"); }
+            get { return GetValueOrDefault("Data Source"); }
             private set { this["Data Source"] = value; }
         }
 
@@ -102,7 +84,7 @@ namespace Google.Cloud.Spanner
             get
             {
                 var result = SpannerClient.DefaultEndpoint.Port;
-                var value = (string) GetValueOrDefault(nameof(Port));
+                var value = GetValueOrDefault(nameof(Port));
                 if (!string.IsNullOrEmpty(value))
                     if (!int.TryParse(value, out result))
                         result = SpannerClient.DefaultEndpoint.Port;
@@ -123,47 +105,10 @@ namespace Google.Cloud.Spanner
         /// </summary>
         public string SpannerInstance => ParsedDataSourcePart(1);
 
-        /// <summary>
-        /// </summary>
-        public string UserName
-        {
-            get { return (string) GetValueOrDefault(nameof(UserName)); }
-            private set { this[nameof(UserName)] = value; }
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <returns></returns>
-        public async Task<UserCredential> QueryForCredentials()
-        {
-            if (Credential == null)
-            {
-                var clientId = ClientId;
-                var clientSecret = ClientSecret;
-                if (!string.IsNullOrEmpty(clientId)
-                    && !string.IsNullOrEmpty(clientSecret))
-                    return
-                        await
-                            GoogleWebAuthorizationBroker.AuthorizeAsync(
-                                    new ClientSecrets {
-                                        ClientId = clientId,
-                                        ClientSecret = clientSecret
-                                    },
-                                    SpannerClient.DefaultScopes,
-                                    "user",
-                                    CancellationToken.None)
-                                .ConfigureAwait(false);
-            }
-            return null;
-        }
-
         internal SpannerConnectionStringBuilder CloneWithNewDataSource(string dataSource)
         {
             return new SpannerConnectionStringBuilder {
                 Credential = Credential,
-                ClientId = ClientId,
-                ClientSecret = ClientSecret,
-                UserName = UserName,
                 Host = Host,
                 Port = Port,
                 DataSource = dataSource

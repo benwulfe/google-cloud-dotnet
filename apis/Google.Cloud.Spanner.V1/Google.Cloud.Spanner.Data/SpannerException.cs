@@ -139,6 +139,8 @@ namespace Google.Cloud.Spanner
             {
                 case ErrorCode.Cancelled:
                     return "The operation was canceled.";
+                case ErrorCode.InvalidArgument:
+                    return "An invalid argument was sent to Spanner.";
                 case ErrorCode.DeadlineExceeded:
                     return "The operation deadline was exceeded.";
                 case ErrorCode.NotFound:
