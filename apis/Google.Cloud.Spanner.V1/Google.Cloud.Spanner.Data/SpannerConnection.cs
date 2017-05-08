@@ -661,7 +661,7 @@ namespace Google.Cloud.Spanner
             if (_volatileResourceManager != null)
                 throw new InvalidOperationException("This connection is already enlisted to a transaction.");
             _volatileResourceManager = new VolatileResourceManager(this, _timestampBound);
-            transaction.EnlistVolatile(_volatileResourceManager, EnlistmentOptions.None);
+            transaction.EnlistVolatile(_volatileResourceManager, System.Transactions.EnlistmentOptions.None);
         }
 
         /// <inheritdoc />
