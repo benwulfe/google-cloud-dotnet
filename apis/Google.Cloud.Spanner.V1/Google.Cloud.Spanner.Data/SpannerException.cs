@@ -20,13 +20,13 @@ using Grpc.Core;
 namespace Google.Cloud.Spanner
 {
     /// <summary>
-    /// Represents an error communicating with the Spanner database.
+    ///     Represents an error communicating with the Spanner database.
     /// </summary>
     public sealed class SpannerException : Exception
     {
         /// <summary>
-        /// This class is a thin conversion around a grpc exception, with the additional
-        /// information of whether the operation is retryable based on the resulting error.
+        ///     This class is a thin conversion around a grpc exception, with the additional
+        ///     information of whether the operation is retryable based on the resulting error.
         /// </summary>
         /// <param name="code"></param>
         /// <param name="innerException"></param>
@@ -49,21 +49,39 @@ namespace Google.Cloud.Spanner
         {
         }
 
+        /// <summary>
+        /// </summary>
+        public ErrorCode ErrorCode { get; }
+
+        /// <summary>
+        /// </summary>
+        public bool IsRetryable
+        {
+            get
+            {
+                switch (ErrorCode)
+                {
+                    case ErrorCode.DeadlineExceeded:
+                    case ErrorCode.Aborted:
+                    case ErrorCode.Unavailable:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        }
+
         internal static bool TryTranslateRpcException(Exception possibleRpcException,
             out SpannerException spannerException)
         {
             spannerException = possibleRpcException as SpannerException;
-            RpcException rpcException = possibleRpcException as RpcException;
+            var rpcException = possibleRpcException as RpcException;
             if (rpcException != null)
-            {
                 spannerException = new SpannerException(rpcException);
-            }
-            AggregateException aggregateException = possibleRpcException as AggregateException;
+            var aggregateException = possibleRpcException as AggregateException;
             if (aggregateException?.InnerExceptions != null)
-            {
                 spannerException = (SpannerException) aggregateException.InnerExceptions
                     .FirstOrDefault(x => x is SpannerException);
-            }
 
             return spannerException != null;
         }
@@ -110,30 +128,7 @@ namespace Google.Cloud.Spanner
             }
         }
 
-        /// <summary>
-        /// </summary>
-        public ErrorCode ErrorCode { get; }
-
-        /// <summary>
-        /// </summary>
-        public bool IsRetryable
-        {
-            get
-            {
-                switch (ErrorCode)
-                {
-                    case ErrorCode.DeadlineExceeded:
-                    case ErrorCode.Aborted:
-                    case ErrorCode.Unavailable:
-                        return true;
-                    default:
-                        return false;
-                }
-                throw new NotImplementedException();
-            }
-        }
-
-        static string GetMessageFromErrorCode(ErrorCode errorCode)
+        private static string GetMessageFromErrorCode(ErrorCode errorCode)
         {
             switch (errorCode)
             {

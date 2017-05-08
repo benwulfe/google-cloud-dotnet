@@ -43,16 +43,6 @@ namespace Google.Cloud.Spanner
         {
         }
 
-        private string GetValueOrDefault(string key, string defaultValue = "")
-        {
-            key = key.ToLower();
-            if (ContainsKey(key))
-            {
-                return (string) this[key];
-            }
-            return defaultValue;
-        }
-
         /// <summary>
         /// </summary>
         public ITokenAccess Credential { get; private set; }
@@ -113,6 +103,14 @@ namespace Google.Cloud.Spanner
                 Port = Port,
                 DataSource = dataSource
             };
+        }
+
+        private string GetValueOrDefault(string key, string defaultValue = "")
+        {
+            key = key.ToLower();
+            if (ContainsKey(key))
+                return (string) this[key];
+            return defaultValue;
         }
 
         private string ParsedDataSourcePart(int index)

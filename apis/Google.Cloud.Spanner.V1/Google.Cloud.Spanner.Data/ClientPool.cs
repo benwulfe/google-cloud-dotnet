@@ -12,8 +12,10 @@ namespace Google.Cloud.Spanner
 {
     internal static class ClientPool
     {
-        static readonly ConcurrentDictionary<ClientPoolKey, ClientPoolEntry> s_clientEntryPool =
+        private static readonly ConcurrentDictionary<ClientPoolKey, ClientPoolEntry> s_clientEntryPool =
             new ConcurrentDictionary<ClientPoolKey, ClientPoolEntry>();
+
+        public static int Timeout { get; set; }
 
         public static Task<SpannerClient> AcquireClientAsync()
         {
@@ -22,21 +24,19 @@ namespace Google.Cloud.Spanner
 
         public static async Task<SpannerClient> AcquireClientAsync(ITokenAccess credentials, ServiceEndpoint endpoint)
         {
-            ClientPoolKey key = new ClientPoolKey {
+            var key = new ClientPoolKey {
                 Credential = credentials ?? ApplicationDefault.Instance,
                 Endpoint = endpoint ?? SpannerClient.DefaultEndpoint
             };
-            ClientPoolEntry poolEntry = s_clientEntryPool.GetOrAdd(key, k => new ClientPoolEntry(key));
+            var poolEntry = s_clientEntryPool.GetOrAdd(key, k => new ClientPoolEntry(key));
             var result = await poolEntry.AcquireClientFromEntryAsync().ConfigureAwait(false);
             Logger.LogPerformanceCounter("SpannerClient.Count", () => s_clientEntryPool.Count);
             return result;
         }
 
-        public static int Timeout { get; set; }
-
         /// <summary>
-        /// Callers should be careful not to call AcquireClient while CloseAll is still running.
-        /// It is possible to obtain a stale client.
+        ///     Callers should be careful not to call AcquireClient while CloseAll is still running.
+        ///     It is possible to obtain a stale client.
         /// </summary>
         /// <returns></returns>
         public static async Task CloseAllAsync()
@@ -46,13 +46,13 @@ namespace Google.Cloud.Spanner
             s_clientEntryPool.Clear();
         }
 
-        struct ClientPoolKey
+        private struct ClientPoolKey
         {
             public ITokenAccess Credential;
             public ServiceEndpoint Endpoint;
         }
 
-        class ClientPoolEntry
+        private class ClientPoolEntry
         {
             private readonly ClientPoolKey _key;
             private SpannerClient _client;
@@ -68,19 +68,14 @@ namespace Google.Cloud.Spanner
                 {
                     Logger.Debug(() => "Creating a new SpannerClient.");
                     if (_key.Credential != null && _key.Credential != ApplicationDefault.Instance)
-                    {
-                        //TODO use a custom channel with specified credentials instead of the pool.
                         _client = await SpannerClient.CreateAsync(_key.Endpoint ?? SpannerClient.DefaultEndpoint,
                                 new SpannerSettings {
                                     CallSettings = CallSettings.FromCallCredentials(_key.Credential.ToCallCredentials())
                                 })
                             .ConfigureAwait(false);
-                    }
                     else
-                    {
                         _client = await SpannerClient.CreateAsync(_key.Endpoint ?? SpannerClient.DefaultEndpoint)
                             .ConfigureAwait(false);
-                    }
                 }
 
                 return _client;

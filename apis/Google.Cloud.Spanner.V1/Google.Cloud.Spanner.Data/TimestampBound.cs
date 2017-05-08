@@ -22,7 +22,19 @@ namespace Google.Cloud.Spanner
     {
         /// <summary>
         /// </summary>
+        public TimestampBoundMode Mode { get; internal set; }
+
+        /// <summary>
+        /// </summary>
+        public TimeSpan Staleness { get; internal set; }
+
+        /// <summary>
+        /// </summary>
         public static TimestampBound Strong { get; } = new TimestampBound {Mode = TimestampBoundMode.Strong};
+
+        /// <summary>
+        /// </summary>
+        public DateTime TimeStamp { get; internal set; }
 
         /// <summary>
         /// </summary>
@@ -71,17 +83,5 @@ namespace Google.Cloud.Spanner
                 TimeStamp = timestamp
             };
         }
-
-        /// <summary>
-        /// </summary>
-        public TimestampBoundMode Mode { get; internal set; }
-
-        /// <summary>
-        /// </summary>
-        public TimeSpan Staleness { get; internal set; }
-
-        /// <summary>
-        /// </summary>
-        public DateTime TimeStamp { get; internal set; }
     }
 }

@@ -35,12 +35,12 @@ namespace Google.Cloud.Spanner
     /// </summary>
     public sealed class SpannerDataReader : DbDataReader
     {
-        private readonly ReliableStreamReader _resultset;
-        private readonly SpannerConnection _connectionToClose;
-        private ResultSetMetadata _metadata;
-        private readonly List<Value> _innerList = new List<Value>();
-        private Dictionary<string, int> _fieldIndex;
         private static long s_readerCount;
+        private readonly SpannerConnection _connectionToClose;
+        private readonly List<Value> _innerList = new List<Value>();
+        private readonly ReliableStreamReader _resultset;
+        private Dictionary<string, int> _fieldIndex;
+        private ResultSetMetadata _metadata;
 
         internal SpannerDataReader(ReliableStreamReader resultset)
         {
@@ -74,26 +74,6 @@ namespace Google.Cloud.Spanner
 
         /// <inheritdoc />
         public override object this[int i] => _innerList[i].ConvertToClrType(GetSpannerFieldType(i));
-
-        private async Task<int> GetFieldIndexAsync(string fieldName, CancellationToken cancellationToken)
-        {
-            fieldName.AssertNotNullOrEmpty(nameof(fieldName));
-            if (_fieldIndex == null)
-            {
-                _fieldIndex = new Dictionary<string, int>();
-                var metadata = await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
-                if (metadata != null)
-                {
-                    int i = 0;
-                    foreach (var field in metadata.RowType.Fields)
-                    {
-                        _fieldIndex[field.Name] = i;
-                        i++;
-                    }
-                }
-            }
-            return _fieldIndex[fieldName];
-        }
 
         /// <inheritdoc />
         public override object this[string name] => this[GetFieldIndexAsync(name, CancellationToken.None).Result];
@@ -174,36 +154,16 @@ namespace Google.Cloud.Spanner
             return fieldMetadata.Type.Code.GetDefaultClrTypeFromSpannerType();
         }
 
-        private V1.Type GetSpannerFieldType(int i)
+        /// <inheritdoc />
+        public override T GetFieldValue<T>(int ordinal)
         {
-            var fieldMetadata = GetMetadataAsync(CancellationToken.None).Result.RowType.Fields[i];
-            return fieldMetadata.Type;
+            return (T) _innerList[ordinal].ConvertToClrType(GetSpannerFieldType(ordinal), typeof(T));
         }
 
         /// <inheritdoc />
         public override float GetFloat(int i)
         {
             return (float) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(float));
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="i"></param>
-        /// <returns></returns>
-        public Value GetJsonValue(int i)
-        {
-            return (Value) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Value));
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="i"></param>
-        /// <returns></returns>
-        public Timestamp GetTimestamp(int i)
-        {
-            return (Timestamp) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Timestamp));
         }
 
         /// <inheritdoc />
@@ -230,6 +190,15 @@ namespace Google.Cloud.Spanner
             return (long) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(long));
         }
 
+        /// <summary>
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
+        public Value GetJsonValue(int i)
+        {
+            return (Value) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Value));
+        }
+
         /// <inheritdoc />
         public override string GetName(int i)
         {
@@ -241,11 +210,9 @@ namespace Google.Cloud.Spanner
         {
             name.AssertNotNullOrEmpty(nameof(name));
             var fields = _resultset.GetMetadataAsync(CancellationToken.None).Result.RowType.Fields;
-            for (int i = 0; i < fields.Count; i++)
-            {
+            for (var i = 0; i < fields.Count; i++)
                 if (Compare(name, fields[i].Name, StringComparison.Ordinal) == 0)
                     return i;
-            }
             return -1;
         }
 
@@ -255,10 +222,13 @@ namespace Google.Cloud.Spanner
             return (string) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(string));
         }
 
-        /// <inheritdoc />
-        public override T GetFieldValue<T>(int ordinal)
+        /// <summary>
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
+        public Timestamp GetTimestamp(int i)
         {
-            return (T) _innerList[ordinal].ConvertToClrType(GetSpannerFieldType(ordinal), typeof(T));
+            return (Timestamp) _innerList[i].ConvertToClrType(GetSpannerFieldType(i), typeof(Timestamp));
         }
 
         /// <inheritdoc />
@@ -295,13 +265,6 @@ namespace Google.Cloud.Spanner
             return ReadAsync(CancellationToken.None).Result;
         }
 
-        private Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
-        {
-            return ExecuteHelper.WithErrorTranslationAndProfiling(async ()
-                => _metadata ?? (_metadata = await _resultset.GetMetadataAsync(cancellationToken)
-                       .ConfigureAwait(false)), "SpannerDataReader.GetMetadata");
-        }
-
         /// <inheritdoc />
         public override Task<bool> ReadAsync(CancellationToken cancellationToken)
         {
@@ -312,15 +275,11 @@ namespace Google.Cloud.Spanner
                 //read # values == # fields.
                 var first = await _resultset.Next(cancellationToken).ConfigureAwait(false);
                 if (first == null)
-                {
                     return false;
-                }
                 _innerList.Add(first);
                 //we expect to get full rows...
-                for (int i = 0; i < _metadata.RowType.Fields.Count - 1; i++)
-                {
+                for (var i = 0; i < _metadata.RowType.Fields.Count - 1; i++)
                     _innerList.Add(await _resultset.Next(cancellationToken).ConfigureAwait(false));
-                }
 
                 return true;
             }, "SpannerDataReader.Read");
@@ -335,6 +294,39 @@ namespace Google.Cloud.Spanner
             _resultset?.Close();
             _connectionToClose?.Close();
             base.Dispose(disposing);
+        }
+
+        private async Task<int> GetFieldIndexAsync(string fieldName, CancellationToken cancellationToken)
+        {
+            fieldName.AssertNotNullOrEmpty(nameof(fieldName));
+            if (_fieldIndex == null)
+            {
+                _fieldIndex = new Dictionary<string, int>();
+                var metadata = await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+                if (metadata != null)
+                {
+                    var i = 0;
+                    foreach (var field in metadata.RowType.Fields)
+                    {
+                        _fieldIndex[field.Name] = i;
+                        i++;
+                    }
+                }
+            }
+            return _fieldIndex[fieldName];
+        }
+
+        private Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
+        {
+            return ExecuteHelper.WithErrorTranslationAndProfiling(async ()
+                => _metadata ?? (_metadata = await _resultset.GetMetadataAsync(cancellationToken)
+                       .ConfigureAwait(false)), "SpannerDataReader.GetMetadata");
+        }
+
+        private V1.Type GetSpannerFieldType(int i)
+        {
+            var fieldMetadata = GetMetadataAsync(CancellationToken.None).Result.RowType.Fields[i];
+            return fieldMetadata.Type;
         }
 
 #if NET45 || NET451

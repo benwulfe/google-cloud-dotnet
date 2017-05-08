@@ -28,11 +28,10 @@ namespace Google.Cloud.Spanner
         , ICloneable
 #endif
     {
+        private readonly ParameterDirection _direction = ParameterDirection.Input;
         private string _sourceColumn;
 
         private string _spannerColumnName;
-        private TypeCode _spannerTypeCode;
-        private ParameterDirection _direction = ParameterDirection.Input;
         private object _value;
 
         /// <summary>
@@ -48,7 +47,7 @@ namespace Google.Cloud.Spanner
         public SpannerParameter(string spannerColumnName, SpannerDbType type)
         {
             _spannerColumnName = spannerColumnName;
-            _spannerTypeCode = type.GetSpannerTypeCode();
+            TypeCode = type.GetSpannerTypeCode();
         }
 
         /// <summary>
@@ -65,8 +64,8 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override DbType DbType
         {
-            get { return _spannerTypeCode.GetDbType(); }
-            set { _spannerTypeCode = value.GetSpannerType(); }
+            get { return TypeCode.GetDbType(); }
+            set { TypeCode = value.GetSpannerType(); }
         }
 
         /// <inheritdoc />
@@ -112,14 +111,12 @@ namespace Google.Cloud.Spanner
 
 #endif
 
-        internal V1.TypeCode TypeCode => _spannerTypeCode;
-
         /// <summary>
         /// </summary>
         public SpannerDbType SpannerDbType
         {
-            get { return _spannerTypeCode.GetSpannerDbType(); }
-            set { _spannerTypeCode = value.GetSpannerTypeCode(); }
+            get { return TypeCode.GetSpannerDbType(); }
+            set { TypeCode = value.GetSpannerTypeCode(); }
         }
 
         /// <inheritdoc />
@@ -128,14 +125,14 @@ namespace Google.Cloud.Spanner
             get { return _value; }
             set
             {
-                if (_spannerTypeCode == TypeCode.Unspecified)
-                {
+                if (TypeCode == TypeCode.Unspecified)
                     throw new ArgumentException(
                         "SpannerDbType must be set to one of (Bool, Int64, Float64, Timestamp, Date, String, Bytes)");
-                }
                 _value = value;
             }
         }
+
+        internal TypeCode TypeCode { get; private set; }
 
         /// <inheritdoc />
         public object Clone()
@@ -146,7 +143,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void ResetDbType()
         {
-            _spannerTypeCode = TypeCode.Unspecified;
+            TypeCode = TypeCode.Unspecified;
         }
     }
 }
