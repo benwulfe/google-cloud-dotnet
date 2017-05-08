@@ -72,7 +72,7 @@ namespace Google.Cloud.Spanner.V1
             }
             if (entry.Session != null)
             {
-                await Key.Client.DeleteSessionAsync(entry.Session.SessionName, cancellationToken).ConfigureAwait(false);
+                await Key.Client.DeleteSessionAsync(entry.Session.GetSessionName(), cancellationToken).ConfigureAwait(false);
             }
         }
 

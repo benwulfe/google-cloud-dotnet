@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Transactions;
 using System.Windows.Forms;
 using Google.Cloud.Spanner;
+using Google.Cloud.Spanner.V1;
 
 namespace WindowsFormsApplication1
 {
@@ -13,16 +14,30 @@ namespace WindowsFormsApplication1
         {
             InitializeComponent();
         }
+        static readonly Random s_rnd = new Random(Environment.TickCount);
+        private static bool onceTrue = false;
 
         private async void button1_Click(object sender, EventArgs e)
         {
+            TestExtensions.SessionGetter = (session) =>
+            {
+                if (onceTrue || (s_rnd != null && s_rnd.Next(100) < 50))
+                {
+                    onceTrue = true;
+                    //use a valid expired session.
+                    return new SessionName(session.SessionName.ProjectId, session.SessionName.InstanceId,
+                        session.SessionName.DatabaseId, "AGxixuX72Phx7LDjnAe8a-AJKEs9lg_XO-avnpjYAWgqXcn-V4xuQ1DagA8");
+                }
+                return session.SessionName;
+            };
+
             SpannerConnection.ConnectionPoolOptions.LogPerformanceTraces = true;
             SpannerConnection.ConnectionPoolOptions.PerformanceTraceLogInterval = 10000;
             SpannerConnection.ConnectionPoolOptions.ResetPerformanceTracesEachInterval = false;
             button1.Text = @"Working!";
             button1.Enabled = false;
-            using (var scope = new TransactionScope())
-            {
+//            using (var scope = new TransactionScope())
+//            {
                 using (var connection = new SpannerConnection("Data Source=spanneref/myspanner/mydatabase"))
                 {
                     await connection.OpenAsync();
@@ -49,7 +64,7 @@ namespace WindowsFormsApplication1
                         long maxId = 0;
                         int rowsAffected;
 
-                        for (int i = 0; i < 1; i++)
+                        for (int i = 0; i < 2; i++)
                         {
                             //QUERY SCALAR
                             cmd = connection.CreateSelectCommand("SELECT MAX(ID) FROM Books");
@@ -97,8 +112,8 @@ namespace WindowsFormsApplication1
                     rowsAffected = await cmd.ExecuteNonQueryAsync();
                     Debug.WriteLine($"{rowsAffected} Rows affected. MaxId={maxId}");
                 }
-                scope.Complete();
-            }
+//                scope.Complete();
+//            }
 
             button1.Text = @"GO!";
             button1.Enabled = true;

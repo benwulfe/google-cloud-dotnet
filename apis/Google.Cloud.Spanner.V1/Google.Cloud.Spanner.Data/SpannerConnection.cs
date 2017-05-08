@@ -591,7 +591,7 @@ namespace Google.Cloud.Spanner
                     {
                         try
                         {
-                            request.SessionAsSessionName = sharedSession.SessionName;
+                            request.SessionAsSessionName = sharedSession.GetSessionName();
                             await _client.ExecuteSqlAsync(request);
                         }
                         catch (Exception e)

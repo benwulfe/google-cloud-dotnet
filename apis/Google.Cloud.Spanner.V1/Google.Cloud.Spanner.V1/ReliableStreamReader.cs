@@ -47,7 +47,7 @@ namespace Google.Cloud.Spanner.V1
                     Expiration.FromTimeout(TimeSpan.FromMilliseconds(600000)),
                     SpannerSettings.IdempotentRetryFilter
                 )));
-            _request.SessionAsSessionName = _session.SessionName;
+            _request.SessionAsSessionName = _session.GetSessionName();
         }
 
         private async Task<Metadata> ConnectAsync()

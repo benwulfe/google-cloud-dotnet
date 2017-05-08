@@ -44,8 +44,8 @@ namespace Google.Cloud.Spanner.V1
             // it needs to exist in the activetransactiontable to indicate that it hasn't been closed
             // the options on it must equal the passed in options.
             if (info.ActiveTransaction != null
-                && !info.ActiveTransaction.Id.IsEmpty
-                && s_activeTransactionTable.ContainsKey(info.ActiveTransaction.Id))
+                && !info.ActiveTransaction.GetTransactionId().IsEmpty
+                && s_activeTransactionTable.ContainsKey(info.ActiveTransaction.GetTransactionId()))
             {
                 if (info.ActiveTransactionOptions != null
                     && info.ActiveTransactionOptions.Equals(options))
@@ -54,14 +54,14 @@ namespace Google.Cloud.Spanner.V1
                 }
                 //cache hit, but no match on options
                 Session ignored;
-                s_activeTransactionTable.TryRemove(info.ActiveTransaction.Id, out ignored);
+                s_activeTransactionTable.TryRemove(info.ActiveTransaction.GetTransactionId(), out ignored);
             }
 
             //ok, our cache hit didnt work for whatever reason.  Let's create a transaction with the given options and return it.
             await info.CreateTransactionAsync(session, options);
             if (info.ActiveTransaction != null)
             {
-                s_activeTransactionTable.AddOrUpdate(info.ActiveTransaction.Id, session, (id, s) => session);
+                s_activeTransactionTable.AddOrUpdate(info.ActiveTransaction.GetTransactionId(), session, (id, s) => session);
             }
             return info.ActiveTransaction;
         }
@@ -88,10 +88,10 @@ namespace Google.Cloud.Spanner.V1
             {
                 //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
                 await info.WaitForPreWarm().ConfigureAwait(false);
-                if (info.ActiveTransaction != null && !info.ActiveTransaction.Id.IsEmpty)
+                if (info.ActiveTransaction != null && !info.ActiveTransaction.GetTransactionId().IsEmpty)
                 {
                     Session ignored;
-                    s_activeTransactionTable.TryRemove(info.ActiveTransaction.Id, out ignored); //clear out old tx.
+                    s_activeTransactionTable.TryRemove(info.ActiveTransaction.GetTransactionId(), out ignored); //clear out old tx.
                 }
                 s_sessionInfoTable.TryRemove(session, out info); //implicit transaction is active on session.
             }
@@ -138,7 +138,7 @@ namespace Google.Cloud.Spanner.V1
         public static Task CommitAsync(this Transaction transaction, Session session, IEnumerable<Mutation> mutations)
         {
             return RunFinalMethodAsync(transaction, session,
-                info => info.SpannerClient.CommitAsync(session.SessionName, info.ActiveTransaction.Id, mutations));
+                info => info.SpannerClient.CommitAsync(session.SessionName, info.ActiveTransaction.GetTransactionId(), mutations));
         }
 
         /// <summary>
@@ -150,7 +150,7 @@ namespace Google.Cloud.Spanner.V1
         public static Task RollbackAsync(this Transaction transaction, Session session)
         {
             return RunFinalMethodAsync(transaction, session,
-                info => info.SpannerClient.RollbackAsync(session.SessionName, info.ActiveTransaction.Id));
+                info => info.SpannerClient.RollbackAsync(session.GetSessionName(), info.ActiveTransaction.GetTransactionId()));
         }
 
         private static async Task RunFinalMethodAsync(Transaction transaction, Session session, Func<SessionInfo, Task> commitOrRollbackAction)
@@ -161,8 +161,8 @@ namespace Google.Cloud.Spanner.V1
                 //we should have already waited, but extra checking cannot hurt.
                 await info.WaitForPreWarm().ConfigureAwait(false);
                 if (info.ActiveTransaction == null
-                    || info.ActiveTransaction.Id.IsEmpty
-                    || !Equals(info.ActiveTransaction.Id, transaction.Id))
+                    || info.ActiveTransaction.GetTransactionId().IsEmpty
+                    || !Equals(info.ActiveTransaction.GetTransactionId(), transaction.GetTransactionId()))
                 {
                     throw new InvalidOperationException("The transaction being committed was not found to have a valid entry.");
                 }
@@ -174,7 +174,7 @@ namespace Google.Cloud.Spanner.V1
                 finally
                 {
                     Session ignored;
-                    s_activeTransactionTable.TryRemove(info.ActiveTransaction.Id, out ignored);
+                    s_activeTransactionTable.TryRemove(info.ActiveTransaction.GetTransactionId(), out ignored);
                 }
             }
             else

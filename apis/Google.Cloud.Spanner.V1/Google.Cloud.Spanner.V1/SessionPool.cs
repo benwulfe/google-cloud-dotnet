@@ -215,7 +215,7 @@ namespace Google.Cloud.Spanner.V1
         private static async Task EvictSession(SpannerClient evictionClient, Session evictionSession)
         {
             await evictionSession.RemoveFromTransactionPool().ConfigureAwait(false);
-            await evictionClient.DeleteSessionAsync(evictionSession.SessionName);
+            await evictionClient.DeleteSessionAsync(evictionSession.GetSessionName());
         }
 
         /// <summary>
@@ -232,7 +232,7 @@ namespace Google.Cloud.Spanner.V1
             {
                 LogSessionsInUse();
                 SignalAnyWaitingRequests();
-                await result.Client.DeleteSessionAsync(session.SessionName).ConfigureAwait(false);
+                await result.Client.DeleteSessionAsync(session.GetSessionName()).ConfigureAwait(false);
                 return;
             }
             throw new InvalidOperationException("Close Session was not able to locate the provided session.");
