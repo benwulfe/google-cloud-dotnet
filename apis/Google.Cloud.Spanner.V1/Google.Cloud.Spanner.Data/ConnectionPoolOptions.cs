@@ -66,6 +66,7 @@ namespace Google.Cloud.Spanner
             }
             set { SessionPool.WaitOnResourcesExhausted = value == ResourcesExhaustedBehavior.Block; }
         }
+        public TimeSpan KeepAliveTimeSpan { get; set; } = TimeSpan.FromMinutes(55);
 
         /// <summary>
         /// Sets the log level for diagnostic logs sent to Trace (for desktop) or stderr (for .Net Core).
@@ -145,10 +146,5 @@ namespace Google.Cloud.Spanner
         /// <summary>
         /// </summary>
         public int TimeoutMilliseconds { get; set; } = 600000;
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public TimeSpan KeepAliveIntervalMinutes { get; set; } = TimeSpan.FromMinutes(55);
     }
 }
