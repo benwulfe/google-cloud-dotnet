@@ -33,7 +33,7 @@ namespace Google.Cloud.Spanner
 
         /// <summary>
         /// </summary>
-        public TimeSpan KeepAliveIntervalMinutes { get; set; } = TimeSpan.FromMinutes(55);
+        public TimeSpan KeepAliveTimeSpan { get; set; } = TimeSpan.FromMinutes(55);
 
         /// <summary>
         ///     Sets the log level for diagnostic logs sent to Trace (for desktop) or stderr (for .Net Core).

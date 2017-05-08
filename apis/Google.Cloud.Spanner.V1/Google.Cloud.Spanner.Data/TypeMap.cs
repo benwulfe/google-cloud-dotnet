@@ -227,7 +227,7 @@ namespace Google.Cloud.Spanner
         {
             //If the wireValue itself is assignable to the target type, just return it
             //This covers both typeof(Value) and typeof(object).
-            if (wireValue == null || targetClrType == null || targetClrType.IsAssignableFrom(typeof(Value)))
+            if (wireValue == null || targetClrType == null || targetClrType == typeof(Value))
                 return wireValue;
 
             //targetClrType should be one of the values returned by GetDefaultClrTypeFromSpannerType

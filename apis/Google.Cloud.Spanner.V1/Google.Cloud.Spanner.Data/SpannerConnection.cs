@@ -17,7 +17,6 @@ using System.Data;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Transactions;
 using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Spanner.V1;
 using Google.Cloud.Spanner.V1.Logging;
@@ -559,7 +558,7 @@ namespace Google.Cloud.Spanner
                 Sql = "SELECT 1"
             };
 
-            var waitTime = (int) ConnectionPoolOptions.KeepAliveIntervalMinutes.TotalMilliseconds;
+            var waitTime = (int) ConnectionPoolOptions.KeepAliveTimeSpan.TotalMilliseconds;
             var task = Task.Delay(waitTime, cancellationToken);
             var loopTask = task.ContinueWith(async t =>
             {
@@ -648,7 +647,7 @@ namespace Google.Cloud.Spanner
             if (_volatileResourceManager != null)
                 throw new InvalidOperationException("This connection is already enlisted to a transaction.");
             _volatileResourceManager = new VolatileResourceManager(this, _timestampBound);
-            transaction.EnlistVolatile(_volatileResourceManager, EnlistmentOptions.None);
+            transaction.EnlistVolatile(_volatileResourceManager, System.Transactions.EnlistmentOptions.None);
         }
 
         /// <inheritdoc />
