@@ -27,7 +27,7 @@ namespace Google.Cloud.Spanner
             catch (Exception e)
             {
                 SpannerException translatedException;
-                if (SpannerException.TryTranslateRpcException(e, out translatedException))
+                if (!(e is SpannerException) && SpannerException.TryTranslateRpcException(e, out translatedException))
                 {
                     throw translatedException;
                 }
@@ -53,7 +53,7 @@ namespace Google.Cloud.Spanner
             catch (Exception e)
             {
                 SpannerException translatedException;
-                if (SpannerException.TryTranslateRpcException(e, out translatedException))
+                if (!(e is SpannerException) && SpannerException.TryTranslateRpcException(e, out translatedException))
                 {
                     throw translatedException;
                 }
@@ -70,7 +70,7 @@ namespace Google.Cloud.Spanner
                 {
                     sw = Stopwatch.StartNew();
                 }
-                T result = await t();
+                T result = await t().ConfigureAwait(false);
                 if (sw != null)
                 {
                     Logger.LogPerformanceCounterFn($"{name}.Duration", x => sw.ElapsedMilliseconds);

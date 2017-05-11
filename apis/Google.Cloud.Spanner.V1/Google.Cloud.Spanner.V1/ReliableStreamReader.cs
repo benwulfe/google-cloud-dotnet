@@ -50,7 +50,7 @@ namespace Google.Cloud.Spanner.V1
             _request.SessionAsSessionName = _session.GetSessionName();
         }
 
-        private async Task<Metadata> ConnectAsync()
+        private Task<Metadata> ConnectAsync()
         {
             Logger.LogPerformanceCounterFn("StreamReader.ConnectCount", x => x + 1);
             if (_resumeToken != null)
@@ -59,7 +59,7 @@ namespace Google.Cloud.Spanner.V1
                 _request.ResumeToken = _resumeToken;
             }
             _currentCall = _spannerClient.ExecuteSqlStream(_request);
-            return await _currentCall.ResponseHeadersAsync.ConfigureAwait(false);
+            return _currentCall.ResponseHeadersAsync.WithSessionChecking(() => _session);
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace Google.Cloud.Spanner.V1
                 for (int i = 0; i <= _resumeSkipCount; i++)
                 {
                     //This calls a simple movenext on purpose.  If we get an error here, we'll fail out.
-                    _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken);
+                    _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken).WithSessionChecking(() => _session).ConfigureAwait(false);
                     if (!_isReading || _currentCall.ResponseStream.Current == null)
                     {
                         return false;
@@ -104,7 +104,7 @@ namespace Google.Cloud.Spanner.V1
                 //we increment our skip count before calling MoveNext so that a reconnect operation
                 //will fast forward to the proper place.
                 _resumeSkipCount++;
-                _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken).ConfigureAwait(false);
+                _isReading = await _currentCall.ResponseStream.MoveNext(cancellationToken).WithSessionChecking(() => _session).ConfigureAwait(false);
             }
             catch (Exception e) 
             {

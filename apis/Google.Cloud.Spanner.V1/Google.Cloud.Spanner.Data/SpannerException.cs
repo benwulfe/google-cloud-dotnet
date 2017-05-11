@@ -16,6 +16,7 @@ using System;
 using System.Linq;
 using Google.Cloud.Spanner.V1.Logging;
 using Grpc.Core;
+using Google.Cloud.Spanner.V1;
 
 namespace Google.Cloud.Spanner
 {
@@ -34,7 +35,7 @@ namespace Google.Cloud.Spanner
             : base(GetMessageFromErrorCode(code), innerException)
         {
             Logger.LogPerformanceCounterFn("SpannerException.Count", x => x + 1);
-            ErrorCode = code;
+            ErrorCode = innerException.IsSessionExpiredError() ? ErrorCode.Aborted : code;
         }
 
         internal SpannerException(ErrorCode code, string message)
@@ -53,16 +54,25 @@ namespace Google.Cloud.Spanner
             out SpannerException spannerException)
         {
             spannerException = possibleRpcException as SpannerException;
-            RpcException rpcException = possibleRpcException as RpcException;
-            if (rpcException != null)
-            {
-                spannerException = new SpannerException(rpcException);
-            }
+
+            RpcException rpcException = null;
             AggregateException aggregateException = possibleRpcException as AggregateException;
+
             if (aggregateException?.InnerExceptions != null)
             {
                 spannerException = (SpannerException) aggregateException.InnerExceptions
                     .FirstOrDefault(x => x is SpannerException);
+                rpcException = (RpcException) aggregateException.InnerExceptions
+                    .FirstOrDefault(x => x is RpcException);
+            }
+            else
+            {
+                rpcException = possibleRpcException as RpcException;
+            }
+
+            if (rpcException != null)
+            {
+                spannerException = new SpannerException(rpcException);
             }
 
             return spannerException != null;
@@ -129,7 +139,6 @@ namespace Google.Cloud.Spanner
                     default:
                         return false;
                 }
-                throw new NotImplementedException();
             }
         }
 

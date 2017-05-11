@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Threading;
@@ -51,6 +52,7 @@ namespace Google.Cloud.Spanner
         private int _sessionRefCount;
         private ConnectionState _state = ConnectionState.Closed;
         private readonly object _sync = new object();
+        private readonly HashSet<string> _staleSessions = new HashSet<string>();
 #if NET45 || NET451
         private VolatileResourceManager _volatileResourceManager;
 #endif
@@ -462,8 +464,14 @@ namespace Google.Cloud.Spanner
                     //we'll also ensure the refcnt is zero, but this should already be true.
                     _sessionRefCount = 0;
                 }
-                else
+                else if (!_staleSessions.Contains(session.Name))
                 {
+                    if (SessionPool.IsSessionExpired(session))
+                    {
+                        //_staleSessions ensures we only release bad sessions once because
+                        //we are clobbering its refcount that it would otherwise use for this purpose.
+                        _staleSessions.Add(session.Name);
+                    }
                     sessionToRelease = session;
                 }
             }
@@ -484,6 +492,13 @@ namespace Google.Cloud.Spanner
 
                 lock (_sync)
                 {
+                    //first we ensure _sharedSession hasn't been invalidated/expired.
+                    if (SessionPool.IsSessionExpired(_sharedSession))
+                    {
+                        _sharedSession = null;
+                        _sessionRefCount = 0; //any existing references will fail out and release them.
+                    }
+
                     //we will use _sharedSession if
                     //a) options == s_defaultTransactionOptions && _sharedSession != null
                     //    (we increment refcnt) and return _sharedSession
@@ -592,12 +607,11 @@ namespace Google.Cloud.Spanner
                         try
                         {
                             request.SessionAsSessionName = sharedSession.GetSessionName();
-                            await _client.ExecuteSqlAsync(request);
+                            await _client.ExecuteSqlAsync(request).WithSessionChecking(() => sharedSession);
                         }
                         catch (Exception e)
                         {
                             Logger.Warn(() => $"Exception attempting to keep session alive: {e}");
-                            return;
                         }
                     }
 

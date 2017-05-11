@@ -41,6 +41,8 @@ namespace Google.Cloud.Spanner.V1
         private static SortedList<SessionPoolImpl, SessionPoolImpl> PriorityList { get; }
             = new SortedList<SessionPoolImpl, SessionPoolImpl>();
 
+        private static readonly ConcurrentDictionary<string, bool> s_blackListedSessions = new ConcurrentDictionary<string, bool>();
+
         static SessionPool()
         {
 #if NET45
@@ -107,6 +109,29 @@ namespace Google.Cloud.Spanner.V1
                 s_sessionsCreating--;
             }
             SignalAnyWaitingRequests();
+        }
+
+        /// <summary>
+        /// Marks a session as expired so that it will never be pooled in the sessionpool
+        /// </summary>
+        /// <param name="session"></param>
+        public static void MarkSessionExpired(Session session)
+        {
+            if (session != null)
+            {
+                s_blackListedSessions.TryAdd(session.Name, true);
+            }
+        }
+
+        /// <summary>
+        /// Returns true if the given session has been marked as expired.
+        /// </summary>
+        /// <param name="session"></param>
+        /// <returns></returns>
+        public static bool IsSessionExpired(Session session)
+        {
+            bool unused;
+            return session != null && s_blackListedSessions.TryGetValue(session.Name, out unused);
         }
 
         /// <summary>
@@ -186,6 +211,12 @@ namespace Google.Cloud.Spanner.V1
             {
                 LogSessionsInUse();
                 SignalAnyWaitingRequests();
+                if (IsSessionExpired(session))
+                {
+                    bool unused;
+                    s_blackListedSessions.TryRemove(session.Name, out unused);
+                    return;
+                }
                 SessionPoolImpl targetPool = GlobalPool.GetOrAdd(result,
                                              key => new SessionPoolImpl(key));
 

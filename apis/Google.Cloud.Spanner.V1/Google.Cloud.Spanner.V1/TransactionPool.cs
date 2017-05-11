@@ -138,7 +138,8 @@ namespace Google.Cloud.Spanner.V1
         public static Task CommitAsync(this Transaction transaction, Session session, IEnumerable<Mutation> mutations)
         {
             return RunFinalMethodAsync(transaction, session,
-                info => info.SpannerClient.CommitAsync(session.SessionName, info.ActiveTransaction.GetTransactionId(), mutations));
+                info => info.SpannerClient.CommitAsync(session.SessionName, info.ActiveTransaction.GetTransactionId(), mutations)
+                    .WithSessionChecking(() => session));
         }
 
         /// <summary>
@@ -150,7 +151,8 @@ namespace Google.Cloud.Spanner.V1
         public static Task RollbackAsync(this Transaction transaction, Session session)
         {
             return RunFinalMethodAsync(transaction, session,
-                info => info.SpannerClient.RollbackAsync(session.GetSessionName(), info.ActiveTransaction.GetTransactionId()));
+                info => info.SpannerClient.RollbackAsync(session.GetSessionName(), info.ActiveTransaction.GetTransactionId())
+                    .WithSessionChecking(() => session));
         }
 
         private static async Task RunFinalMethodAsync(Transaction transaction, Session session, Func<SessionInfo, Task> commitOrRollbackAction)
@@ -223,7 +225,7 @@ namespace Google.Cloud.Spanner.V1
                 {
                     SessionAsSessionName = session.SessionName,
                     Options = ActiveTransactionOptions
-                }).ConfigureAwait(false);
+                }).WithSessionChecking(() => session).ConfigureAwait(false);
                 s_activeTransactionTable.AddOrUpdate(ActiveTransaction.Id, session, (id, s) => session);
             }
 
