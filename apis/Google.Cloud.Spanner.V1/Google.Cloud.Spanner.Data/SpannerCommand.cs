@@ -115,8 +115,14 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override UpdateRowSource UpdatedRowSource
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get { return UpdateRowSource.None; }
+            set
+            {
+                if (value != UpdateRowSource.None)
+                {
+                    throw new NotSupportedException("UpdatedRowSource is not supported in Cloud Spanner.");
+                }
+            }
         }
 
         /// <inheritdoc />

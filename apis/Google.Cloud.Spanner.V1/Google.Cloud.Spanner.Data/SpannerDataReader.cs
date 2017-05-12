@@ -16,6 +16,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Api.Gax;
@@ -317,7 +318,7 @@ namespace Google.Cloud.Spanner
             return _fieldIndex[fieldName];
         }
 
-        private Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
+        internal Task<ResultSetMetadata> GetMetadataAsync(CancellationToken cancellationToken)
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(async ()
                 => _metadata ?? (_metadata = await _resultset.GetMetadataAsync(cancellationToken)
@@ -331,7 +332,6 @@ namespace Google.Cloud.Spanner
         }
 
 #if NET45 || NET451
-
         /// <inheritdoc />
         public override void Close()
         {
@@ -341,7 +341,41 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override DataTable GetSchemaTable()
         {
-            throw new NotSupportedException("Querying Schema information about queries is not supported in Spanner.");
+            //Spanner does not provide enough information for a schema table.
+            //DbDataAdapter will adjust and fill the dataset with information from
+            //this datareader (such as field type and name).
+            return null;
+//            var resultSet = GetMetadataAsync(CancellationToken.None).Result;
+//            if (resultSet?.RowType?.Fields?.Count == 0) // No resultset
+//                return null;
+//
+//            var table = new DataTable("SchemaTable");
+//
+//            table.Columns.Add("ColumnName", typeof(string));
+//            table.Columns.Add("ColumnOrdinal", typeof(int));
+//            table.Columns.Add("DataType", typeof(System.Type));
+//            table.Columns.Add("NumericPrecision", typeof(int));
+//            table.Columns.Add("ProviderType", typeof(SpannerDbType));
+//
+//            Debug.Assert(resultSet != null, "resultSet != null");
+//            Debug.Assert(resultSet.RowType != null, "resultSet.RowType != null");
+//            Debug.Assert(resultSet.RowType.Fields != null, "resultSet.RowType.Fields != null");
+//
+//            int ordinal = 0;
+//            foreach (var field in resultSet.RowType.Fields)
+//            {
+//                var row = table.NewRow();
+//
+//                row["ColumnName"] = field.Name;
+//                row["ColumnOrdinal"] = ordinal;
+//                row["DataType"] = field.Type.Code.GetDefaultClrTypeFromSpannerType();
+//                row["ProviderType"] = field.Type.Code.GetSpannerDbType();
+//                table.Rows.Add(row);
+//
+//                ordinal++;
+//            }
+//
+//            return table;
         }
 
 #endif

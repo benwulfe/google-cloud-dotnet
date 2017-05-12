@@ -36,15 +36,12 @@ namespace Google.Cloud.Spanner
             DataTableMapping tableMapping)
             : base(row, command, statementType, tableMapping)
         {
-            throw new NotImplementedException();
+            Command = (SpannerCommand) command;
         }
 
         /// <summary>
         /// </summary>
-        public new SpannerCommand Command
-        {
-            get { throw new NotImplementedException(); }
-        }
+        public new SpannerCommand Command { get; }
     }
 
 #endif

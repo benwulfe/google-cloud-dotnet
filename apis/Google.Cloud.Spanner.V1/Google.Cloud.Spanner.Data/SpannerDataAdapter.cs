@@ -16,8 +16,10 @@
 // ReSharper disable EmptyNamespace
 
 using System;
+using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
+using System.Threading;
 
 namespace Google.Cloud.Spanner
 {
@@ -27,6 +29,9 @@ namespace Google.Cloud.Spanner
     /// </summary>
     public sealed class SpannerDataAdapter : DbDataAdapter, IDbDataAdapter
     {
+        private SpannerCommand _selectCommand;
+        private SpannerCommand _builtInsertCommand;
+
         /// <summary>
         /// </summary>
         public SpannerDataAdapter()
@@ -39,80 +44,107 @@ namespace Google.Cloud.Spanner
         /// <param name="connection"></param>
         public SpannerDataAdapter(string sqlQuery, SpannerConnection connection)
         {
-            throw new NotImplementedException();
+            SpannerConnection = connection;
+            SelectCommand = connection.CreateSelectCommand(sqlQuery);
         }
 
         /// <summary>
+        /// 
         /// </summary>
-        public new SpannerCommand DeleteCommand
-        {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
-        }
+        [Category("Configuration")]
+        public bool BuildUpdateCommands { get; set; } = true;
 
         /// <summary>
         /// </summary>
-        public new SpannerCommand InsertCommand
-        {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
-        }
+        [Category("Commands")]
+        public new SpannerCommand DeleteCommand { get; set; }
 
         /// <summary>
         /// </summary>
+        [Category("Commands")]
+        public new SpannerCommand InsertCommand { get; set; }
+
+        /// <summary>
+        /// </summary>
+        [Category("Commands")]
         public new SpannerCommand SelectCommand
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get
+            {
+                if (_selectCommand == null && SpannerConnection != null && SelectStatement != null)
+                {
+                    ClearBuiltCommands();
+                    _selectCommand = SpannerConnection.CreateSelectCommand(SelectStatement);
+                }
+                return _selectCommand;
+            }
+            set
+            {
+                ClearBuiltCommands();
+                _selectCommand = value;
+            }
         }
 
         /// <summary>
         /// </summary>
-        public new SpannerCommand UpdateCommand
-        {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
-        }
+        [Category("Commands")]
+        public new SpannerCommand UpdateCommand { get; set; }
 
+        [Browsable(false)]
         IDbCommand IDbDataAdapter.DeleteCommand
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get { return DeleteCommand; }
+            set { DeleteCommand = (SpannerCommand) value; }
         }
 
+        [Browsable(false)]
         IDbCommand IDbDataAdapter.InsertCommand
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get { return InsertCommand; }
+            set { InsertCommand = (SpannerCommand) value; }
         }
 
+        [Browsable(false)]
         IDbCommand IDbDataAdapter.SelectCommand
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get { return SelectCommand; }
+            set { SelectCommand = (SpannerCommand) value; }
         }
 
+        [Browsable(false)]
         IDbCommand IDbDataAdapter.UpdateCommand
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get { return UpdateCommand; }
+            set { UpdateCommand = (SpannerCommand) value; }
         }
 
         /// <summary>
+        /// 
         /// </summary>
-        public event EventHandler<SpannerRowUpdatedEventArgs> RowUpdated
+        [Category("Configuration")]
+        public string SelectStatement
         {
-            add { throw new NotImplementedException(); }
-            remove { throw new NotImplementedException(); }
+            get { return _selectStatement; }
+            set
+            {
+                _selectCommand = null;
+                _selectStatement = value;
+            }
         }
 
         /// <summary>
+        /// 
         /// </summary>
-        public event EventHandler<SpannerRowUpdatingEventArgs> RowUpdating
-        {
-            add { throw new NotImplementedException(); }
-            remove { throw new NotImplementedException(); }
-        }
+        [Category("Configuration")]
+        public SpannerConnection SpannerConnection { get; set; }
+
+        /// <summary>
+        /// </summary>
+        public event EventHandler<SpannerRowUpdatedEventArgs> RowUpdated;
+
+        /// <summary>
+        /// </summary>
+        public event EventHandler<SpannerRowUpdatingEventArgs> RowUpdating;
 
         /*
          * Implement abstract methods inherited from DbDataAdapter.
@@ -121,28 +153,134 @@ namespace Google.Cloud.Spanner
         protected override RowUpdatedEventArgs CreateRowUpdatedEvent(DataRow dataRow, IDbCommand command,
             StatementType statementType, DataTableMapping tableMapping)
         {
-            throw new NotImplementedException();
+            return new SpannerRowUpdatedEventArgs(dataRow, command, statementType, tableMapping);
         }
 
         /// <inheritdoc />
         protected override RowUpdatingEventArgs CreateRowUpdatingEvent(DataRow dataRow, IDbCommand command,
             StatementType statementType, DataTableMapping tableMapping)
         {
-            throw new NotImplementedException();
+            return new SpannerRowUpdatingEventArgs(dataRow, command, statementType, tableMapping);
         }
 
         /// <inheritdoc />
-        protected override void OnRowUpdated(RowUpdatedEventArgs value)
+        protected override void OnRowUpdated(RowUpdatedEventArgs rowUpdatedEventArgs)
         {
-            throw new NotImplementedException();
+            RowUpdated?.Invoke(this, (SpannerRowUpdatedEventArgs) rowUpdatedEventArgs);
+        }
+
+        private readonly SpannerParameterCollection _parsedParameterCollection = new SpannerParameterCollection();
+        private SpannerCommand _builtUpdateCommand;
+        private SpannerCommand _builtDeleteCommand;
+        private string _selectStatement;
+        private string _updateTable;
+
+        /// <inheritdoc />
+        protected override int Fill(DataSet dataSet, string srcTable, IDataReader dataReader, int startRecord, int maxRecords)
+        {
+            SpannerDataReader spannerDataReader = dataReader as SpannerDataReader;
+            if (spannerDataReader != null && BuildUpdateCommands)
+            {
+                var readerMetadata = spannerDataReader.GetMetadataAsync(CancellationToken.None).Result;
+                foreach (var field in readerMetadata.RowType.Fields)
+                {
+                    _parsedParameterCollection.Add(
+                        new SpannerParameter(field.Name, field.Type.Code.GetSpannerDbType(), field.Name));
+                }
+            }
+
+            return base.Fill(dataSet, srcTable, dataReader, startRecord, maxRecords);
+        }
+
+        private void ClearBuiltCommands()
+        {
+            _builtInsertCommand = null;
+            _builtDeleteCommand = null;
+            _builtUpdateCommand = null;
+        }
+
+        private SpannerCommand BuildInsertCommand()
+        {
+            if (_builtInsertCommand != null)
+            {
+                return _builtInsertCommand;
+            }
+            if (_parsedParameterCollection != null)
+            {
+                _builtInsertCommand = SpannerConnection.CreateInsertCommand(UpdateTable, _parsedParameterCollection);
+            }
+            return _builtInsertCommand;
+        }
+
+        private SpannerCommand BuildUpdateCommand()
+        {
+            if (_builtUpdateCommand != null)
+            {
+                return _builtUpdateCommand;
+            }
+            if (_parsedParameterCollection != null)
+            {
+                _builtUpdateCommand = SpannerConnection.CreateUpdateCommand(UpdateTable, _parsedParameterCollection);
+            }
+            return _builtUpdateCommand;
+        }
+
+        private SpannerCommand BuildDeleteCommand()
+        {
+            if (_builtDeleteCommand != null)
+            {
+                return _builtDeleteCommand;
+            }
+            if (_parsedParameterCollection != null)
+            {
+                _builtDeleteCommand = SpannerConnection.CreateDeleteCommand(UpdateTable, _parsedParameterCollection);
+            }
+            return _builtDeleteCommand;
         }
 
         /// <inheritdoc />
-        protected override void OnRowUpdating(RowUpdatingEventArgs value)
+        protected override void OnRowUpdating(RowUpdatingEventArgs rowUpdatingEventArgs)
         {
-            throw new NotImplementedException();
+            if (rowUpdatingEventArgs.Command == null && BuildUpdateCommands)
+            {
+                //show a friendly exception before this bails later in case
+                //the user forgot to set this property.
+                if (string.IsNullOrEmpty(UpdateTable))
+                {
+                    throw new InvalidOperationException("You must set SpannderDataAdapter.UpdateTable to automatically generate update commands.");
+                }
+
+                switch (rowUpdatingEventArgs.StatementType)
+                {
+                    case StatementType.Insert:
+                        rowUpdatingEventArgs.Command = BuildInsertCommand();
+                        break;
+                    case StatementType.Update:
+                        rowUpdatingEventArgs.Command = BuildUpdateCommand();
+                        break;
+                    case StatementType.Delete:
+                        rowUpdatingEventArgs.Command = BuildDeleteCommand();
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+            RowUpdating?.Invoke(this, (SpannerRowUpdatingEventArgs) rowUpdatingEventArgs);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        [Category("Configuration")]
+        public string UpdateTable
+        {
+            get { return _updateTable; }
+            set
+            {
+                ClearBuiltCommands();
+                _updateTable = value;
+            }
         }
     }
-
 #endif
 }

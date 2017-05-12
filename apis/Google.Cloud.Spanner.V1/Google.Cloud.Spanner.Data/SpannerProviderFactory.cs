@@ -33,25 +33,25 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override DbCommand CreateCommand()
         {
-            throw new NotImplementedException();
+            return new SpannerCommand();
         }
 
         /// <inheritdoc />
         public override DbConnection CreateConnection()
         {
-            throw new NotImplementedException();
+            return new SpannerConnection();
         }
 
         /// <inheritdoc />
         public override DbConnectionStringBuilder CreateConnectionStringBuilder()
         {
-            throw new NotImplementedException();
+            return new SpannerConnectionStringBuilder();
         }
 
         /// <inheritdoc />
         public override DbParameter CreateParameter()
         {
-            throw new NotImplementedException();
+            return new SpannerParameter();
         }
 
 #if NET45 || NET451
@@ -59,15 +59,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override DbDataAdapter CreateDataAdapter()
         {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <returns></returns>
-        public SpannerCommandBuilder CreateSpannerCommandBuilder()
-        {
-            throw new NotImplementedException();
+            return new SpannerDataAdapter();
         }
 
 #endif
