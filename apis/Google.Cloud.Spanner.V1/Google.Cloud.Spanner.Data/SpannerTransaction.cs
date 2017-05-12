@@ -82,18 +82,15 @@ namespace Google.Cloud.Spanner
             }, "SpannerTransaction.ExecuteMutations");
         }
 
-        Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(string sql,
-            CancellationToken cancellationToken)
+        Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(ExecuteSqlRequest request, CancellationToken cancellationToken)
         {
-            GaxPreconditions.CheckNotNullOrEmpty(sql, nameof(sql));
+            GaxPreconditions.CheckNotNull(request, nameof(request));
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
             {
                 var taskCompletionSource =
                     new TaskCompletionSource<ReliableStreamReader>();
-                taskCompletionSource.SetResult(_connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest {
-                    Sql = sql,
-                    Transaction = GetTransactionSelector(TransactionMode.ReadOnly)
-                }, Session));
+                request.Transaction = GetTransactionSelector(TransactionMode.ReadOnly);
+                taskCompletionSource.SetResult(_connection.SpannerClient.GetSqlStreamReader(request, Session));
 
                 return taskCompletionSource.Task;
             }, "SpannerTransaction.ExecuteQuery");

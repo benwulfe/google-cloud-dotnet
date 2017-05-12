@@ -106,12 +106,12 @@ namespace Google.Cloud.Spanner
             return await ((ISpannerTransaction) transaction).ExecuteMutationsAsync(mutations, cancellationToken);
         }
 
-        public async Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
+        public async Task<ReliableStreamReader> ExecuteQueryAsync(ExecuteSqlRequest request, CancellationToken cancellationToken)
         {
             var transaction = await GetTransactionAsync(cancellationToken);
             if (transaction == null)
                 throw new InvalidOperationException("Unable to obtain a spanner transaction to execute within.");
-            return await((ISpannerTransaction) transaction).ExecuteQueryAsync(sql, cancellationToken);
+            return await((ISpannerTransaction) transaction).ExecuteQueryAsync(request, cancellationToken);
         }
 
         private async Task<SpannerTransaction> GetTransactionAsync(CancellationToken cancellationToken)

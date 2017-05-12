@@ -50,21 +50,20 @@ namespace Google.Cloud.Spanner
             }, "EphemeralTransaction.ExecuteMutations");
         }
 
-        public Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken)
+        public Task<ReliableStreamReader> ExecuteQueryAsync(ExecuteSqlRequest request, CancellationToken cancellationToken)
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
             {
-                GaxPreconditions.CheckNotNullOrEmpty(sql, nameof(sql));
+                GaxPreconditions.CheckNotNull(request, nameof(request));
                 Logger.Debug(() => "Executing a query through an ephemeral transaction.");
 
                 using (var holder = await SpannerConnection.SessionHolder
                     .Allocate(_connection, cancellationToken)
                     .ConfigureAwait(false))
                 {
-                    var streamReader = _connection.SpannerClient.GetSqlStreamReader(new ExecuteSqlRequest {
-                        Sql = sql
-                    }, holder.TakeOwnership());
+                    var streamReader = _connection.SpannerClient.GetSqlStreamReader(request, holder.Session);
 
+                    holder.TakeOwnership();
                     streamReader.StreamClosed += (o, e) => { _connection.ReleaseSession(streamReader.Session); };
 
                     return streamReader;

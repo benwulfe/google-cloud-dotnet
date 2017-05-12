@@ -190,9 +190,7 @@ namespace Google.Cloud.Spanner
             if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Delete)
             {
                 var w = new Mutation.Types.Write {Table = SpannerCommandTextBuilder.TargetTable};
-                //Parameters["ID"].Value = (long) Parameters["ID"].Value + 1;
-                w.Columns.AddRange(Parameters.Cast<SpannerParameter>()
-                    .Select(x => x.SourceColumn ?? x.ParameterName));
+                w.Columns.AddRange(Parameters.Cast<SpannerParameter>().Select(x => x.SourceColumn ?? x.ParameterName));
                 w.Values.Add(new ListValue {
                     Values = {Parameters.Cast<SpannerParameter>().Select(x => TypeMap.ToValue(x.Value, x.TypeCode))}
                 });
@@ -326,8 +324,20 @@ namespace Google.Cloud.Spanner
             if (!SpannerConnection.IsOpen)
                 throw new InvalidOperationException("Unable to open the Spanner connection to the database.");
 
+            var request = new ExecuteSqlRequest
+            {
+                Sql = CommandText
+            };
+
+            if (Parameters?.Count > 0)
+            {
+                request.Params = new Struct();
+                Parameters.FillSpannerInternalValues(request.Params.Fields);
+                Parameters.FillSpannerInternalTypes(request.ParamTypes);
+            }
+
             // Execute the command.
-            var resultset = await GetSpannerTransaction().ExecuteQueryAsync(CommandText, cancellationToken)
+            var resultset = await GetSpannerTransaction().ExecuteQueryAsync(request, cancellationToken)
                 .WithTimeout(TimeSpan.FromSeconds(CommandTimeout), "The timeout of the SpannerCommand was exceeded.");
 
             if ((behavior & CommandBehavior.CloseConnection) == CommandBehavior.CloseConnection)
