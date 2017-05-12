@@ -17,6 +17,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
+using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
 
 namespace Google.Cloud.Spanner
 {
@@ -173,6 +175,22 @@ namespace Google.Cloud.Spanner
                 InnerList.Add((SpannerParameter) value);
             else
                 InnerList[index] = (SpannerParameter) value;
+        }
+
+        internal void FillSpannerInternalValues(MapField<string, Value> valueDictionary)
+        {
+            foreach (var parameter in InnerList)
+            {
+                valueDictionary[parameter.ParameterName] = TypeMap.ToValue(parameter.Value, parameter.TypeCode);
+            }
+        }
+
+        internal void FillSpannerInternalTypes(MapField<string, V1.Type> typeDictionary)
+        {
+            foreach (var parameter in InnerList)
+            {
+                typeDictionary[parameter.ParameterName] = new V1.Type { Code = parameter.TypeCode };
+            }
         }
     }
 }

@@ -8,6 +8,6 @@ namespace Google.Cloud.Spanner
     internal interface ISpannerTransaction
     {
         Task<int> ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken);
-        Task<ReliableStreamReader> ExecuteQueryAsync(string sql, CancellationToken cancellationToken);
+        Task<ReliableStreamReader> ExecuteQueryAsync(ExecuteSqlRequest request, CancellationToken cancellationToken);
     }
 }
