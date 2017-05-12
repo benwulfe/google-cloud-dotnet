@@ -1,14 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Api.Gax;
 using Google.Cloud.Spanner.V1;
 using Google.Cloud.Spanner.V1.Logging;
 
 namespace Google.Cloud.Spanner
 {
     /// <summary>
-    ///     EphemeralTransaction acquires sessions from the provided SpannerConnection on an as-needed basis.
-    ///     It holds no long term refcounts or state of its own and can be created and GC'd at will.
+    /// EphemeralTransaction acquires sessions from the provided SpannerConnection on an as-needed basis.
+    /// It holds no long term refcounts or state of its own and can be created and GC'd at will.
     /// </summary>
     internal sealed class EphemeralTransaction : ISpannerTransaction
     {
@@ -16,22 +17,22 @@ namespace Google.Cloud.Spanner
 
         public EphemeralTransaction(SpannerConnection connection)
         {
-            connection.AssertNotNull(nameof(connection));
+            GaxPreconditions.CheckNotNull(connection, nameof(connection));
             _connection = connection;
         }
 
         /// <summary>
-        ///     Acquires a read/write transaction from Spannerconnection and releases the transaction back into the pool
-        ///     after the operation is complete.
-        ///     SpannerCommand never uses implicit Transactions for write operations because they are non idempotent and
-        ///     may result in unexpected errors if retry is used.
+        /// Acquires a read/write transaction from Spannerconnection and releases the transaction back into the pool
+        /// after the operation is complete.
+        /// SpannerCommand never uses implicit Transactions for write operations because they are non idempotent and
+        /// may result in unexpected errors if retry is used.
         /// </summary>
         /// <param name="mutations"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         public Task<int> ExecuteMutationsAsync(List<Mutation> mutations, CancellationToken cancellationToken)
         {
-            mutations.AssertNotNull(nameof(mutations));
+            GaxPreconditions.CheckNotNull(mutations, nameof(mutations));
             Logger.Debug(() => "Executing a mutation change through an ephemeral transaction.");
             int count;
 
@@ -53,7 +54,7 @@ namespace Google.Cloud.Spanner
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(async () =>
             {
-                sql.AssertNotNullOrEmpty(nameof(sql));
+                GaxPreconditions.CheckNotNullOrEmpty(sql, nameof(sql));
                 Logger.Debug(() => "Executing a query through an ephemeral transaction.");
 
                 using (var holder = await SpannerConnection.SessionHolder

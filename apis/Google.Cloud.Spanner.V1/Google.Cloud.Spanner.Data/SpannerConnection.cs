@@ -17,6 +17,7 @@ using System.Data;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Api.Gax;
 using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Spanner.V1;
 using Google.Cloud.Spanner.V1.Logging;
@@ -31,7 +32,7 @@ using Transaction = System.Transactions.Transaction;
 namespace Google.Cloud.Spanner
 {
     /// <summary>
-    ///     A SpannerConnection represents a connection to a single Spanner database.
+    /// A SpannerConnection represents a connection to a single Spanner database.
     /// </summary>
     public sealed class SpannerConnection : DbConnection
     {
@@ -65,16 +66,16 @@ namespace Google.Cloud.Spanner
 #endif
 
         /// <summary>
-        ///     Creates a SpannerConnection with no datasource or credential specified.
+        /// Creates a SpannerConnection with no datasource or credential specified.
         /// </summary>
         public SpannerConnection()
         {
         }
 
         /// <summary>
-        ///     Creates a SpannerConnection with a datasource contained in connectionString
-        ///     and optional credential information supplied in connectionString or the credential
-        ///     argument.
+        /// Creates a SpannerConnection with a datasource contained in connectionString
+        /// and optional credential information supplied in connectionString or the credential
+        /// argument.
         /// </summary>
         /// <param name="connectionString">A Spanner formatted connection string.</param>
         /// <param name="credential">An optional credential.</param>
@@ -84,21 +85,21 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
-        ///     Creates a SpannerConnection with a datasource contained in connectionString.
+        /// Creates a SpannerConnection with a datasource contained in connectionString.
         /// </summary>
         /// <param name="connectionStringBuilder">
-        ///     A SpannerConnectionStringBuilder containing
-        ///     a formatted connection string.
+        /// A SpannerConnectionStringBuilder containing
+        /// a formatted connection string.
         /// </param>
         public SpannerConnection(SpannerConnectionStringBuilder connectionStringBuilder)
         {
-            connectionStringBuilder.AssertNotNull(nameof(connectionStringBuilder));
+            GaxPreconditions.CheckNotNull(connectionStringBuilder, nameof(connectionStringBuilder));
             TrySetNewConnectionInfo(connectionStringBuilder);
         }
 
         /// <summary>
-        ///     Provides options to customize how connections to Spanner are created
-        ///     and maintained.
+        /// Provides options to customize how connections to Spanner are created
+        /// and maintained.
         /// </summary>
         public static ConnectionPoolOptions ConnectionPoolOptions => ConnectionPoolOptions.Instance;
 
@@ -113,7 +114,7 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
-        ///     Returns the credential used for the connection, if set.
+        /// Returns the credential used for the connection, if set.
         /// </summary>
         public ITokenAccess Credential => _connectionStringBuilder.Credential;
 
@@ -305,7 +306,7 @@ namespace Google.Cloud.Spanner
         {
             if (IsOpen)
                 return;
-            Task.Run(OpenAsync).Wait(ConnectionPoolOptions.Instance.TimeoutMilliseconds);
+            Task.Run(OpenAsync).Wait(ConnectionPoolOptions.Instance.Timeout);
         }
 
         /// <inheritdoc />
@@ -558,7 +559,7 @@ namespace Google.Cloud.Spanner
                 Sql = "SELECT 1"
             };
 
-            var waitTime = (int) ConnectionPoolOptions.KeepAliveTimeSpan.TotalMilliseconds;
+            var waitTime = (int) ConnectionPoolOptions.KeepAliveInterval.TotalMilliseconds;
             var task = Task.Delay(waitTime, cancellationToken);
             var loopTask = task.ContinueWith(async t =>
             {
@@ -593,8 +594,8 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
-        ///     SessionHolder is a helper class to ensure that sessions do not leak and are properly recycled when
-        ///     an error occurs.
+        /// SessionHolder is a helper class to ensure that sessions do not leak and are properly recycled when
+        /// an error occurs.
         /// </summary>
         internal sealed class SessionHolder : IDisposable
         {

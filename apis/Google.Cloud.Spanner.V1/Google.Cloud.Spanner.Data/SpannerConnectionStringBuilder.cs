@@ -22,7 +22,7 @@ using Google.Cloud.Spanner.V1;
 namespace Google.Cloud.Spanner
 {
     /// <summary>
-    ///     A connection string builder for Spanner connection strings.
+    /// A connection string builder for Spanner connection strings.
     /// </summary>
     public sealed class SpannerConnectionStringBuilder : DbConnectionStringBuilder
     {

@@ -20,13 +20,13 @@ using Grpc.Core;
 namespace Google.Cloud.Spanner
 {
     /// <summary>
-    ///     Represents an error communicating with the Spanner database.
+    /// Represents an error communicating with the Spanner database.
     /// </summary>
     public sealed class SpannerException : Exception
     {
         /// <summary>
-        ///     This class is a thin conversion around a grpc exception, with the additional
-        ///     information of whether the operation is retryable based on the resulting error.
+        /// This class is a thin conversion around a grpc exception, with the additional
+        /// information of whether the operation is retryable based on the resulting error.
         /// </summary>
         /// <param name="code"></param>
         /// <param name="innerException"></param>
@@ -74,7 +74,7 @@ namespace Google.Cloud.Spanner
         internal static bool TryTranslateRpcException(Exception possibleRpcException,
             out SpannerException spannerException)
         {
-            spannerException = possibleRpcException as SpannerException;
+            spannerException = null;
             var rpcException = possibleRpcException as RpcException;
             if (rpcException != null)
                 spannerException = new SpannerException(rpcException);

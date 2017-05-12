@@ -293,7 +293,7 @@ namespace Google.Cloud.Spanner.V1
         /// at the cost of performance due to lower reuse of sessions.
         /// This value must be less than the expire timer on the Spanner server currently set at 60 minutes.
         /// </summary>
-        public static TimeSpan PoolEvictTimeSpan { get; set; } = TimeSpan.FromMinutes(15);
+        public static TimeSpan PoolEvictTimeDelay { get; set; } = TimeSpan.FromMinutes(15);
 
 
         /// <summary>
@@ -303,5 +303,9 @@ namespace Google.Cloud.Spanner.V1
         /// </summary>
         public static bool UseTransactionWarming { get; set; } = true;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        public static TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
     }
 }

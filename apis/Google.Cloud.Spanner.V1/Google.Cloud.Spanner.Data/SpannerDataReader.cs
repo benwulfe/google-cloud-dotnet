@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Api.Gax;
 using Google.Cloud.Spanner.V1;
 using Google.Cloud.Spanner.V1.Logging;
 using Google.Protobuf.WellKnownTypes;
@@ -44,7 +45,7 @@ namespace Google.Cloud.Spanner
 
         internal SpannerDataReader(ReliableStreamReader resultset)
         {
-            resultset.AssertNotNull(nameof(resultset));
+            GaxPreconditions.CheckNotNull(resultset, nameof(resultset));
             Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount",
                 () => Interlocked.Increment(ref s_readerCount));
             _resultset = resultset;
@@ -52,7 +53,7 @@ namespace Google.Cloud.Spanner
 
         internal SpannerDataReader(ReliableStreamReader resultset, SpannerConnection connectionToClose)
         {
-            resultset.AssertNotNull(nameof(resultset));
+            GaxPreconditions.CheckNotNull(resultset, nameof(resultset));
             Logger.LogPerformanceCounter("SpannerDataReader.ActiveCount",
                 () => Interlocked.Increment(ref s_readerCount));
             _resultset = resultset;
@@ -208,7 +209,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override int GetOrdinal(string name)
         {
-            name.AssertNotNullOrEmpty(nameof(name));
+            GaxPreconditions.CheckNotNullOrEmpty(name, nameof(name));
             var fields = _resultset.GetMetadataAsync(CancellationToken.None).Result.RowType.Fields;
             for (var i = 0; i < fields.Count; i++)
                 if (Compare(name, fields[i].Name, StringComparison.Ordinal) == 0)
@@ -298,7 +299,7 @@ namespace Google.Cloud.Spanner
 
         private async Task<int> GetFieldIndexAsync(string fieldName, CancellationToken cancellationToken)
         {
-            fieldName.AssertNotNullOrEmpty(nameof(fieldName));
+            GaxPreconditions.CheckNotNullOrEmpty(fieldName, nameof(fieldName));
             if (_fieldIndex == null)
             {
                 _fieldIndex = new Dictionary<string, int>();

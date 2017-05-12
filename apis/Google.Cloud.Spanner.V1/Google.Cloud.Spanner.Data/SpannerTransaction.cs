@@ -18,6 +18,7 @@ using System.Data;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Api.Gax;
 using Google.Cloud.Spanner.V1;
 using Google.Cloud.Spanner.V1.Logging;
 
@@ -37,9 +38,9 @@ namespace Google.Cloud.Spanner
         internal SpannerTransaction(SpannerConnection connection, TransactionMode mode, Session session,
             Transaction transaction)
         {
-            connection.AssertNotNull(nameof(connection));
-            session.AssertNotNull(nameof(session));
-            transaction.AssertNotNull(nameof(transaction));
+            GaxPreconditions.CheckNotNull(connection, nameof(connection));
+            GaxPreconditions.CheckNotNull(session, nameof(session));
+            GaxPreconditions.CheckNotNull(transaction, nameof(transaction));
 
             Logger.LogPerformanceCounter("Transactions.ActiveCount",
                 () => Interlocked.Increment(ref s_transactionCount));
@@ -69,7 +70,7 @@ namespace Google.Cloud.Spanner
         Task<int> ISpannerTransaction.ExecuteMutationsAsync(List<Mutation> mutations,
             CancellationToken cancellationToken)
         {
-            mutations.AssertNotNull(nameof(mutations));
+            GaxPreconditions.CheckNotNull(mutations, nameof(mutations));
             CheckCompatibleMode(TransactionMode.ReadWrite);
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
             {
@@ -84,7 +85,7 @@ namespace Google.Cloud.Spanner
         Task<ReliableStreamReader> ISpannerTransaction.ExecuteQueryAsync(string sql,
             CancellationToken cancellationToken)
         {
-            sql.AssertNotNullOrEmpty(nameof(sql));
+            GaxPreconditions.CheckNotNullOrEmpty(sql, nameof(sql));
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
             {
                 var taskCompletionSource =
@@ -101,7 +102,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void Commit()
         {
-            if (!Task.Run(CommitAsync).Wait(ConnectionPoolOptions.Instance.TimeoutMilliseconds))
+            if (!Task.Run(CommitAsync).Wait(ConnectionPoolOptions.Instance.Timeout))
                 throw new SpannerException(ErrorCode.DeadlineExceeded, "The Commit did not complete in time.");
         }
 
@@ -112,7 +113,7 @@ namespace Google.Cloud.Spanner
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
             {
-                Mode.AssertTrue(x => x != TransactionMode.ReadOnly, "You cannot commit a readonly transaction.");
+                GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x != TransactionMode.ReadOnly))(Mode), "You cannot commit a readonly transaction.");
                 return _transaction.CommitAsync(Session, Mutations);
             }, "SpannerTransaction.Commit");
         }
@@ -120,7 +121,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override void Rollback()
         {
-            if (!Task.Run(RollbackAsync).Wait(ConnectionPoolOptions.Instance.TimeoutMilliseconds))
+            if (!Task.Run(RollbackAsync).Wait(ConnectionPoolOptions.Instance.Timeout))
                 throw new SpannerException(ErrorCode.DeadlineExceeded, "The Rollback did not complete in time.");
         }
 
@@ -131,7 +132,7 @@ namespace Google.Cloud.Spanner
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
             {
-                Mode.AssertTrue(x => x == TransactionMode.ReadOnly, "You cannot roll back a readonly transaction.");
+                GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x == TransactionMode.ReadOnly))(Mode), "You cannot roll back a readonly transaction.");
                 return _transaction.RollbackAsync(Session);
             }, "SpannerTransaction.Rollback");
         }
@@ -149,12 +150,14 @@ namespace Google.Cloud.Spanner
             switch (mode)
             {
                 case TransactionMode.ReadOnly:
-                    Mode.AssertTrue(x => x == TransactionMode.ReadOnly || x == TransactionMode.ReadWrite,
-                        "You can only execute reads on a ReadWrite or ReadOnly Transaction!");
+                {
+                    GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x == TransactionMode.ReadOnly || x == TransactionMode.ReadWrite))(Mode), "You can only execute reads on a ReadWrite or ReadOnly Transaction!");
+                }
                     break;
                 case TransactionMode.ReadWrite:
-                    Mode.AssertTrue(x => x == TransactionMode.ReadWrite,
-                        "You can only execute read/write commands on a ReadWrite Transaction!");
+                {
+                    GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x == TransactionMode.ReadWrite))(Mode), "You can only execute read/write commands on a ReadWrite Transaction!");
+                }
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
@@ -164,7 +167,7 @@ namespace Google.Cloud.Spanner
         private TransactionSelector GetTransactionSelector(TransactionMode mode)
         {
             CheckCompatibleMode(mode);
-            _transaction.AssertTrue(x => x != null, "Transaction should have been created prior to use.");
+            GaxPreconditions.CheckState(((Predicate<Transaction>) (x => x != null))(_transaction), "Transaction should have been created prior to use.");
             return new TransactionSelector {Id = _transaction?.Id};
         }
     }
