@@ -64,7 +64,8 @@ namespace Google.Cloud.Spanner
                 {
                     return (LogLevel) underlyingLevel;
                 }
-                throw new IndexOutOfRangeException("Invalid log level specified.");
+                // ReSharper disable once NotResolvedInText
+                throw new ArgumentOutOfRangeException("LogLevel");
             }
             set
             {
@@ -73,7 +74,8 @@ namespace Google.Cloud.Spanner
                 {
                     Logger.LogLevel = (V1.Logging.LogLevel)underlyingLevel;
                 }
-                throw new IndexOutOfRangeException("Invalid log level specified.");
+                // ReSharper disable once NotResolvedInText
+                throw new ArgumentOutOfRangeException("LogLevel");
             }
         }
 
@@ -97,8 +99,8 @@ namespace Google.Cloud.Spanner
         /// </summary>
         public TimeSpan PoolEvictionDelay
         {
-            get { return SessionPool.PoolEvictTimeDelay; }
-            set { SessionPool.PoolEvictTimeDelay = value; }
+            get { return SessionPool.PoolEvictionDelay; }
+            set { SessionPool.PoolEvictionDelay = value; }
         }
 
         /// <summary>

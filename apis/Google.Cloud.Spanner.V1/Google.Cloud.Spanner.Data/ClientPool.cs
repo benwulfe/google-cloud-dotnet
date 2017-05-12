@@ -19,8 +19,7 @@ namespace Google.Cloud.Spanner
         public static async Task<SpannerClient> AcquireClientAsync(ITokenAccess credentials = null,
             ServiceEndpoint endpoint = null)
         {
-            var key = new ClientPoolKey(credentials,
-                endpoint ?? SpannerClient.DefaultEndpoint);
+            var key = new ClientPoolKey(credentials, endpoint ?? SpannerClient.DefaultEndpoint);
             var poolEntry = s_clientEntryPool.GetOrAdd(key, k => new ClientPoolEntry(key));
             var result = await poolEntry.AcquireClientFromEntryAsync().ConfigureAwait(false);
             Logger.LogPerformanceCounter("SpannerClient.Count", () => s_clientEntryPool.Count);

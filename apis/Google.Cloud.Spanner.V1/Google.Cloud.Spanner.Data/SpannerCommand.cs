@@ -236,14 +236,10 @@ namespace Google.Cloud.Spanner
             }
 
             // Make the request.  This will commit immediately or not depending on whether a transaction was explicitly created.
-            var task = GetSpannerTransaction().ExecuteMutationsAsync(mutations, cancellationToken);
-            if (await Task.WhenAny(task, Task.Delay(CommandTimeout, cancellationToken)).ConfigureAwait(false) == task)
-            {
-                await task;
-                // Return the number of records affected.
-                return mutations.Count;
-            }
-            throw new SpannerException(ErrorCode.DeadlineExceeded, "The timeout of the SpannerCommand was exceeded.");
+            await GetSpannerTransaction().ExecuteMutationsAsync(mutations, cancellationToken)
+                .WithTimeout(TimeSpan.FromSeconds(CommandTimeout), "The timeout of the SpannerCommand was exceeded.");
+            // Return the number of records affected.
+            return mutations.Count;
         }
 
         /// <inheritdoc />
@@ -331,16 +327,13 @@ namespace Google.Cloud.Spanner
                 throw new InvalidOperationException("Unable to open the Spanner connection to the database.");
 
             // Execute the command.
-            var task = GetSpannerTransaction().ExecuteQueryAsync(CommandText, cancellationToken);
-            if (await Task.WhenAny(task, Task.Delay(CommandTimeout, cancellationToken)).ConfigureAwait(false) == task)
-            {
-                var resultset = await task;
+            var resultset = await GetSpannerTransaction().ExecuteQueryAsync(CommandText, cancellationToken)
+                .WithTimeout(TimeSpan.FromSeconds(CommandTimeout), "The timeout of the SpannerCommand was exceeded.");
 
-                if ((behavior & CommandBehavior.CloseConnection) == CommandBehavior.CloseConnection)
-                    return new SpannerDataReader(resultset, SpannerConnection);
-                return new SpannerDataReader(resultset);
-            }
-            throw new SpannerException(ErrorCode.DeadlineExceeded, "The timeout of the SpannerCommand was exceeded.");
+            if ((behavior & CommandBehavior.CloseConnection) == CommandBehavior.CloseConnection)
+                return new SpannerDataReader(resultset, SpannerConnection);
+
+            return new SpannerDataReader(resultset);
         }
 
         internal ISpannerTransaction GetSpannerTransaction()

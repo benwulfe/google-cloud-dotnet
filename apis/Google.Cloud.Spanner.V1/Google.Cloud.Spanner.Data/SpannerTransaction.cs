@@ -103,7 +103,7 @@ namespace Google.Cloud.Spanner
         public override void Commit()
         {
             if (!Task.Run(CommitAsync).Wait(ConnectionPoolOptions.Instance.Timeout))
-                throw new SpannerException(ErrorCode.DeadlineExceeded, "The Commit did not complete in time.");
+                throw new TimeoutException("The Commit did not complete in time.");
         }
 
         /// <summary>
@@ -113,7 +113,7 @@ namespace Google.Cloud.Spanner
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
             {
-                GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x != TransactionMode.ReadOnly))(Mode), "You cannot commit a readonly transaction.");
+                GaxPreconditions.CheckState(Mode != TransactionMode.ReadOnly, "You cannot commit a readonly transaction.");
                 return _transaction.CommitAsync(Session, Mutations);
             }, "SpannerTransaction.Commit");
         }
@@ -122,7 +122,7 @@ namespace Google.Cloud.Spanner
         public override void Rollback()
         {
             if (!Task.Run(RollbackAsync).Wait(ConnectionPoolOptions.Instance.Timeout))
-                throw new SpannerException(ErrorCode.DeadlineExceeded, "The Rollback did not complete in time.");
+                throw new TimeoutException("The Rollback did not complete in time.");
         }
 
         /// <summary>
@@ -132,7 +132,7 @@ namespace Google.Cloud.Spanner
         {
             return ExecuteHelper.WithErrorTranslationAndProfiling(() =>
             {
-                GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x == TransactionMode.ReadOnly))(Mode), "You cannot roll back a readonly transaction.");
+                GaxPreconditions.CheckState(Mode != TransactionMode.ReadOnly, "You cannot roll back a readonly transaction.");
                 return _transaction.RollbackAsync(Session);
             }, "SpannerTransaction.Rollback");
         }
@@ -151,12 +151,12 @@ namespace Google.Cloud.Spanner
             {
                 case TransactionMode.ReadOnly:
                 {
-                    GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x == TransactionMode.ReadOnly || x == TransactionMode.ReadWrite))(Mode), "You can only execute reads on a ReadWrite or ReadOnly Transaction!");
+                    GaxPreconditions.CheckState(Mode == TransactionMode.ReadOnly || Mode == TransactionMode.ReadWrite, "You can only execute reads on a ReadWrite or ReadOnly Transaction!");
                 }
                     break;
                 case TransactionMode.ReadWrite:
                 {
-                    GaxPreconditions.CheckState(((Predicate<TransactionMode>) (x => x == TransactionMode.ReadWrite))(Mode), "You can only execute read/write commands on a ReadWrite Transaction!");
+                    GaxPreconditions.CheckState(Mode == TransactionMode.ReadWrite, "You can only execute read/write commands on a ReadWrite Transaction!");
                 }
                     break;
                 default:
@@ -167,7 +167,7 @@ namespace Google.Cloud.Spanner
         private TransactionSelector GetTransactionSelector(TransactionMode mode)
         {
             CheckCompatibleMode(mode);
-            GaxPreconditions.CheckState(((Predicate<Transaction>) (x => x != null))(_transaction), "Transaction should have been created prior to use.");
+            GaxPreconditions.CheckState(_transaction != null, "Transaction should have been created prior to use.");
             return new TransactionSelector {Id = _transaction?.Id};
         }
     }
