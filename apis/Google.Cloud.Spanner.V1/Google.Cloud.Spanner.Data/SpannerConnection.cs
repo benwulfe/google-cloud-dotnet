@@ -559,8 +559,7 @@ namespace Google.Cloud.Spanner
                 Sql = "SELECT 1"
             };
 
-            var waitTime = (int) ConnectionPoolOptions.KeepAliveInterval.TotalMilliseconds;
-            var task = Task.Delay(waitTime, cancellationToken);
+            var task = Task.Delay(ConnectionPoolOptions.KeepAliveInterval, cancellationToken);
             var loopTask = task.ContinueWith(async t =>
             {
                 if (!cancellationToken.IsCancellationRequested)

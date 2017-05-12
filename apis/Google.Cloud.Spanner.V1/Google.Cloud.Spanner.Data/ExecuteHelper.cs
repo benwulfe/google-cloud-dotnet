@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Google.Cloud.Spanner.V1.Logging;
 
@@ -52,6 +53,13 @@ namespace Google.Cloud.Spanner
             {
                 throw translatedException;
             }
+        }
+
+        internal static async Task<T> WithTimeout<T>(this Task<T> task, TimeSpan timeout, string timeoutMessage)
+        {
+            if (task != await Task.WhenAny(task, Task.Delay(timeout, CancellationToken.None)))
+                throw new TimeoutException(timeoutMessage);
+            return await task;
         }
     }
 }

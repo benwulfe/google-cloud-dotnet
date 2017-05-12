@@ -42,7 +42,7 @@ namespace Google.Cloud.Spanner.V1
 
         private Task EvictSessionPoolEntry(Session session, CancellationToken cancellationToken)
         {
-            var task = Task.Delay(SessionPool.PoolEvictTimeDelay, cancellationToken);
+            var task = Task.Delay(SessionPool.PoolEvictionDelay, cancellationToken);
             return task.ContinueWith(async (delayTask, o) => 
             {
                 Logger.Debug(() => "Evict timer triggered.");
