@@ -8,11 +8,11 @@
         /// <summary>
         /// 
         /// </summary>
-        Debug = 0,
+        None = 0,
         /// <summary>
         /// 
         /// </summary>
-        Info = 1,
+        Error = 1,
         /// <summary>
         /// 
         /// </summary>
@@ -20,10 +20,10 @@
         /// <summary>
         /// 
         /// </summary>
-        Error = 3,
+        Info = 3,
         /// <summary>
         /// 
         /// </summary>
-        None = 4,
+        Debug = 4
     }
 }

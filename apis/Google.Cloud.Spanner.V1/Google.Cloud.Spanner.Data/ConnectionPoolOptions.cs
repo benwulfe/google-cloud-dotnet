@@ -27,17 +27,9 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
-        ///     The default instance of connection pool options.
+        /// The default instance of connection pool options.
         /// </summary>
         public static ConnectionPoolOptions Instance { get; } = new ConnectionPoolOptions();
-
-        /// <summary>
-        /// </summary>
-        public TimeSpan PoolEvictTimeSpan
-        {
-            get { return SessionPool.PoolEvictTimeSpan; }
-            set { SessionPool.PoolEvictTimeSpan = value; }
-        }
 
         /// <summary>
         /// </summary>
@@ -56,68 +48,32 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
-        /// </summary>
-        public ResourcesExhaustedBehavior ResourcesExhaustedBehavior
-        {
-            get
-            {
-                return SessionPool.WaitOnResourcesExhausted
-                    ? ResourcesExhaustedBehavior.Block
-                    : ResourcesExhaustedBehavior.Fail;
-            }
-            set { SessionPool.WaitOnResourcesExhausted = value == ResourcesExhaustedBehavior.Block; }
-        }
-
-        /// <summary>
         /// 
         /// </summary>
-        public TimeSpan KeepAliveTimeSpan { get; set; } = TimeSpan.FromMinutes(55);
+        public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromMinutes(55);
 
         /// <summary>
-        ///     Sets the log level for diagnostic logs sent to Trace (for desktop) or stderr (for .Net Core).
+        /// Sets the log level for diagnostic logs sent to Trace (for desktop) or stderr (for .Net Core).
         /// </summary>
         public LogLevel LogLevel
         {
             get
             {
-                switch (Logger.LogLevel)
+                int underlyingLevel = (int)Logger.LogLevel;
+                if (Enum.IsDefined(typeof(LogLevel), underlyingLevel))
                 {
-                    case V1.Logging.LogLevel.Debug:
-                        return LogLevel.Debug;
-                    case V1.Logging.LogLevel.Info:
-                        return LogLevel.Info;
-                    case V1.Logging.LogLevel.Warn:
-                        return LogLevel.Warn;
-                    case V1.Logging.LogLevel.Error:
-                        return LogLevel.Error;
-                    case V1.Logging.LogLevel.None:
-                        return LogLevel.None;
-                    default:
-                        throw new ArgumentOutOfRangeException();
+                    return (LogLevel) underlyingLevel;
                 }
+                throw new IndexOutOfRangeException("Invalid log level specified.");
             }
             set
             {
-                switch (value)
+                int underlyingLevel = (int)value;
+                if (Enum.IsDefined(typeof(V1.Logging.LogLevel), underlyingLevel))
                 {
-                    case LogLevel.Debug:
-                        Logger.LogLevel = V1.Logging.LogLevel.Debug;
-                        break;
-                    case LogLevel.Info:
-                        Logger.LogLevel = V1.Logging.LogLevel.Info;
-                        break;
-                    case LogLevel.Warn:
-                        Logger.LogLevel = V1.Logging.LogLevel.Warn;
-                        break;
-                    case LogLevel.Error:
-                        Logger.LogLevel = V1.Logging.LogLevel.Error;
-                        break;
-                    case LogLevel.None:
-                        Logger.LogLevel = V1.Logging.LogLevel.None;
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(value), value, null);
+                    Logger.LogLevel = (V1.Logging.LogLevel)underlyingLevel;
                 }
+                throw new IndexOutOfRangeException("Invalid log level specified.");
             }
         }
 
@@ -137,6 +93,13 @@ namespace Google.Cloud.Spanner
             set { Logger.PerformanceTraceLogInterval = value; }
         }
 
+        /// <summary>
+        /// </summary>
+        public TimeSpan PoolEvictionDelay
+        {
+            get { return SessionPool.PoolEvictTimeDelay; }
+            set { SessionPool.PoolEvictTimeDelay = value; }
+        }
 
         /// <summary>
         /// </summary>
@@ -147,7 +110,25 @@ namespace Google.Cloud.Spanner
         }
 
         /// <summary>
+        /// 
         /// </summary>
-        public int TimeoutMilliseconds { get; set; } = 600000;
+        public ResourcesExhaustedBehavior ResourcesExhaustedBehavior
+        {
+            get
+            {
+                return SessionPool.WaitOnResourcesExhausted
+                    ? ResourcesExhaustedBehavior.Block
+                    : ResourcesExhaustedBehavior.Fail;
+            }
+            set { SessionPool.WaitOnResourcesExhausted = value == ResourcesExhaustedBehavior.Block; }
+        }
+
+        /// <summary>
+        /// </summary>
+        public TimeSpan Timeout
+        {
+            get { return SessionPool.Timeout; }
+            set { SessionPool.Timeout = value; }
+        }
     }
 }

@@ -86,7 +86,7 @@ namespace Google.Cloud.Spanner.V1.Logging
 
         internal static void Debug(Func<string> messageFunc)
         {
-            if (LogLevel <= LogLevel.Debug)
+            if (LogLevel >= LogLevel.Debug)
             {
                 Instance.Debug(messageFunc());
             }
@@ -94,7 +94,7 @@ namespace Google.Cloud.Spanner.V1.Logging
 
         internal static void Info(Func<string> messageFunc)
         {
-            if (LogLevel <= LogLevel.Info)
+            if (LogLevel >= LogLevel.Info)
             {
                 Instance.Debug(messageFunc());
             }
@@ -102,7 +102,7 @@ namespace Google.Cloud.Spanner.V1.Logging
 
         internal static void Warn(Func<string> messageFunc)
         {
-            if (LogLevel <= LogLevel.Warn)
+            if (LogLevel >= LogLevel.Warn)
             {
                 Instance.Debug(messageFunc());
             }
@@ -110,7 +110,7 @@ namespace Google.Cloud.Spanner.V1.Logging
 
         internal static void Error(Func<string> messageFunc, Exception exception = null)
         {
-            if (LogLevel <= LogLevel.Error)
+            if (LogLevel >= LogLevel.Error)
             {
                 Instance.Debug(messageFunc());
             }

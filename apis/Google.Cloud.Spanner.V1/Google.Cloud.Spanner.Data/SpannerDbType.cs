@@ -15,62 +15,62 @@
 namespace Google.Cloud.Spanner
 {
     /// <summary>
-    ///     These types come from Google.Cloud.Spanner.V1.TypeCode
+    /// These types come from Google.Cloud.Spanner.V1.TypeCode
     /// </summary>
     public enum SpannerDbType
     {
         /// <summary>
-        ///     Not specified.
+        /// Not specified.
         /// </summary>
         Unspecified = 0,
 
         /// <summary>
-        ///     Encoded as JSON `true` or `false`.
+        /// Encoded as JSON `true` or `false`.
         /// </summary>
         Bool = 1,
 
         /// <summary>
-        ///     Encoded as `string`, in decimal format.
+        /// Encoded as `string`, in decimal format.
         /// </summary>
         Int64 = 2,
 
         /// <summary>
-        ///     Encoded as `number`, or the strings `"NaN"`, `"Infinity"`, or
-        ///     `"-Infinity"`.
+        /// Encoded as `number`, or the strings `"NaN"`, `"Infinity"`, or
+        /// `"-Infinity"`.
         /// </summary>
         Float64 = 3,
 
         /// <summary>
-        ///     Encoded as `string` in RFC 3339 timestamp format. The time zone
-        ///     must be present, and must be `"Z"`.
+        /// Encoded as `string` in RFC 3339 timestamp format. The time zone
+        /// must be present, and must be `"Z"`.
         /// </summary>
         Timestamp = 4,
 
         /// <summary>
-        ///     Encoded as `string` in RFC 3339 date format.
+        /// Encoded as `string` in RFC 3339 date format.
         /// </summary>
         Date = 5,
 
         /// <summary>
-        ///     Encoded as `string`.
+        /// Encoded as `string`.
         /// </summary>
         String = 6,
 
         /// <summary>
-        ///     Encoded as a base64-encoded `string`, as described in RFC 4648,
-        ///     section 4.
+        /// Encoded as a base64-encoded `string`, as described in RFC 4648,
+        /// section 4.
         /// </summary>
         Bytes = 7,
 
         /// <summary>
-        ///     Encoded as `list`, where the list elements are represented
-        ///     according to [array_element_type][google.spanner.v1.Type.array_element_type].
+        /// Encoded as `list`, where the list elements are represented
+        /// according to [array_element_type][google.spanner.v1.Type.array_element_type].
         /// </summary>
         Array = 8,
 
         /// <summary>
-        ///     Encoded as `list`, where list element `i` is represented according
-        ///     to [struct_type.fields[i]][google.spanner.v1.StructType.fields].
+        /// Encoded as `list`, where list element `i` is represented according
+        /// to [struct_type.fields[i]][google.spanner.v1.StructType.fields].
         /// </summary>
         Struct = 9
     }

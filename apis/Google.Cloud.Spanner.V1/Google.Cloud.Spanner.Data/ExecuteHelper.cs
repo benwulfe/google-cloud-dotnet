@@ -9,6 +9,7 @@ namespace Google.Cloud.Spanner
     {
         internal static void WithErrorTranslationAndProfiling(Action t, string name)
         {
+            SpannerException translatedException;
             try
             {
                 Stopwatch sw = null;
@@ -18,53 +19,38 @@ namespace Google.Cloud.Spanner
                 if (sw != null)
                     Logger.LogPerformanceCounterFn($"{name}.Duration", x => sw.ElapsedMilliseconds);
             }
-            catch (Exception e)
+            catch (Exception e) when (SpannerException.TryTranslateRpcException(e, out translatedException))
             {
-                SpannerException translatedException;
-                if (SpannerException.TryTranslateRpcException(e, out translatedException))
-                    throw translatedException;
-                throw;
+                throw translatedException;
             }
         }
 
-        internal static async Task WithErrorTranslationAndProfiling(Func<Task> t, string name)
+        internal static Task WithErrorTranslationAndProfiling(Func<Task> t, string name)
         {
-            try
+            return WithErrorTranslationAndProfiling(async () =>
             {
-                Stopwatch sw = null;
-                if (Logger.LogPerformanceTraces)
-                    sw = Stopwatch.StartNew();
                 await t().ConfigureAwait(false);
-                if (sw != null)
-                    Logger.LogPerformanceCounterFn($"{name}.Duration", x => sw.ElapsedMilliseconds);
-            }
-            catch (Exception e)
-            {
-                SpannerException translatedException;
-                if (SpannerException.TryTranslateRpcException(e, out translatedException))
-                    throw translatedException;
-                throw;
-            }
+                return 0;
+            }, name);
         }
 
         internal static async Task<T> WithErrorTranslationAndProfiling<T>(Func<Task<T>> t, string name)
         {
+            SpannerException translatedException;
+
             try
             {
                 Stopwatch sw = null;
                 if (Logger.LogPerformanceTraces)
                     sw = Stopwatch.StartNew();
-                T result = await t().ConfigureAwait(false);
+                var result = await t().ConfigureAwait(false);
                 if (sw != null)
                     Logger.LogPerformanceCounterFn($"{name}.Duration", x => sw.ElapsedMilliseconds);
                 return result;
             }
-            catch (Exception e)
+            catch (Exception e) when (SpannerException.TryTranslateRpcException(e, out translatedException))
             {
-                SpannerException translatedException;
-                if (!(e is SpannerException) && SpannerException.TryTranslateRpcException(e, out translatedException))
-                    throw translatedException;
-                throw;
+                throw translatedException;
             }
         }
     }

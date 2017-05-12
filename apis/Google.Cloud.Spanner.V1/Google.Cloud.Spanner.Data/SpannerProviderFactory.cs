@@ -22,7 +22,7 @@ namespace Google.Cloud.Spanner
     public sealed class SpannerProviderFactory : DbProviderFactory
     {
         /// <summary>
-        ///     The default SpannerProviderFactory instance.
+        /// The default SpannerProviderFactory instance.
         /// </summary>
         public static readonly SpannerProviderFactory s_instance = new SpannerProviderFactory();
 

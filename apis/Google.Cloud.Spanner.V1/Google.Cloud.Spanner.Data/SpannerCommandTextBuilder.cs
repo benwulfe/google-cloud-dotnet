@@ -14,6 +14,7 @@
 
 using System;
 using System.Linq;
+using Google.Api.Gax;
 
 // ReSharper disable UnusedParameter.Local
 
@@ -38,7 +39,7 @@ namespace Google.Cloud.Spanner
         /// <exception cref="InvalidOperationException"></exception>
         public SpannerCommandTextBuilder(string commandText)
         {
-            commandText.AssertNotNullOrEmpty(nameof(commandText));
+            GaxPreconditions.CheckNotNullOrEmpty(commandText, nameof(commandText));
             var commandSections = commandText.Split(' ');
             if (commandSections.Length < 2)
                 throw new InvalidOperationException($"{commandText} is not a recognized Spanner command.");
@@ -155,7 +156,7 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static SpannerCommandTextBuilder FromCommandText(string commandText)
         {
-            commandText.AssertNotNullOrEmpty(nameof(commandText));
+            GaxPreconditions.CheckNotNullOrEmpty(commandText, nameof(commandText));
             return new SpannerCommandTextBuilder(commandText);
         }
 
@@ -186,7 +187,7 @@ namespace Google.Cloud.Spanner
 
         private static void ValidateTable(string databaseTableName)
         {
-            databaseTableName.AssertNotNullOrEmpty(nameof(databaseTableName));
+            GaxPreconditions.CheckNotNullOrEmpty(databaseTableName, nameof(databaseTableName));
             if (!databaseTableName.All(c => char.IsLetterOrDigit(c) || c == '_'))
                 throw new ArgumentException($"{nameof(databaseTableName)} only allows letters, numbers or underscore");
         }

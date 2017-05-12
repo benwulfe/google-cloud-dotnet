@@ -6,22 +6,22 @@
     {
         /// <summary>
         /// </summary>
-        Debug = 0,
+        Debug = V1.Logging.LogLevel.Debug,
 
         /// <summary>
         /// </summary>
-        Info = 1,
+        Info = V1.Logging.LogLevel.Info,
 
         /// <summary>
         /// </summary>
-        Warn = 2,
+        Warn = V1.Logging.LogLevel.Warn,
 
         /// <summary>
         /// </summary>
-        Error = 3,
+        Error = V1.Logging.LogLevel.Error,
 
         /// <summary>
         /// </summary>
-        None = 4
+        None = V1.Logging.LogLevel.None
     }
 }
