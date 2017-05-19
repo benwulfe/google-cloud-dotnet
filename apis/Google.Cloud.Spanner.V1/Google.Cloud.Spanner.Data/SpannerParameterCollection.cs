@@ -177,7 +177,13 @@ namespace Google.Cloud.Spanner
                 InnerList[index] = (SpannerParameter) value;
         }
 
-        internal void FillSpannerInternalValues(MapField<string, Value> valueDictionary)
+        internal void FillSpannerInternalValues(MapField<string, Value> valueDictionary, MapField<string, V1.Type> requestParamTypes)
+        {
+            FillSpannerInternalValues(valueDictionary);
+            FillSpannerInternalTypes(requestParamTypes);
+        }
+
+        private void FillSpannerInternalValues(MapField<string, Value> valueDictionary)
         {
             foreach (var parameter in InnerList)
             {
@@ -185,7 +191,7 @@ namespace Google.Cloud.Spanner
             }
         }
 
-        internal void FillSpannerInternalTypes(MapField<string, V1.Type> typeDictionary)
+        private void FillSpannerInternalTypes(MapField<string, V1.Type> typeDictionary)
         {
             foreach (var parameter in InnerList)
             {

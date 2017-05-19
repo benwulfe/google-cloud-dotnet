@@ -59,7 +59,7 @@ namespace Google.Cloud.Spanner
         {
             if (task != await Task.WhenAny(task, Task.Delay(timeout, CancellationToken.None)))
                 throw new TimeoutException(timeoutMessage);
-            return await task;
+            return await task.ConfigureAwait(false);
         }
     }
 }

@@ -24,11 +24,11 @@ namespace Google.Cloud.Spanner
     /// </summary>
     public sealed class SpannerCommandTextBuilder
     {
-        private static readonly string s_insertCommand = "INSERT";
-        private static readonly string s_insertUpdateCommand = "INSERTUPDATE";
-        private static readonly string s_updateCommand = "UPDATE";
-        private static readonly string s_deleteCommand = "DELETE";
-        private static readonly string s_selectCommand = "SELECT";
+        private const string InsertCommand = "INSERT";
+        private const string InsertUpdateCommand = "INSERTUPDATE";
+        private const string UpdateCommand = "UPDATE";
+        private const string DeleteCommand = "DELETE";
+        private const string SelectCommand = "SELECT";
 
         private string _targetTable;
 
@@ -44,12 +44,12 @@ namespace Google.Cloud.Spanner
             if (commandSections.Length < 2)
                 throw new InvalidOperationException($"{commandText} is not a recognized Spanner command.");
             var newBuilder = new SpannerCommandTextBuilder();
-            if (!TryParseCommand(this, s_deleteCommand, SpannerCommandType.Delete, commandSections)
-                && !TryParseCommand(this, s_updateCommand, SpannerCommandType.Update, commandSections)
-                && !TryParseCommand(this, s_insertCommand, SpannerCommandType.Insert, commandSections)
-                && !TryParseCommand(this, s_insertUpdateCommand, SpannerCommandType.InsertOrUpdate, commandSections))
+            if (!TryParseCommand(this, DeleteCommand, SpannerCommandType.Delete, commandSections)
+                && !TryParseCommand(this, UpdateCommand, SpannerCommandType.Update, commandSections)
+                && !TryParseCommand(this, InsertCommand, SpannerCommandType.Insert, commandSections)
+                && !TryParseCommand(this, InsertUpdateCommand, SpannerCommandType.InsertOrUpdate, commandSections))
             {
-                if (!commandSections[0].ToUpper().StartsWith(s_selectCommand))
+                if (!commandSections[0].ToUpper().StartsWith(SelectCommand))
                     throw new InvalidOperationException($"{commandText} is not a recognized Spanner command.");
                 newBuilder.CommandText = commandText;
                 newBuilder.SpannerCommandType = SpannerCommandType.Select;
@@ -92,7 +92,7 @@ namespace Google.Cloud.Spanner
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.Delete,
                 TargetTable = databaseTableName,
-                CommandText = $"{s_deleteCommand} {databaseTableName}"
+                CommandText = $"{DeleteCommand} {databaseTableName}"
             };
         }
 
@@ -106,7 +106,7 @@ namespace Google.Cloud.Spanner
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.InsertOrUpdate,
                 TargetTable = databaseTableName,
-                CommandText = $"{s_insertUpdateCommand} {databaseTableName}"
+                CommandText = $"{InsertUpdateCommand} {databaseTableName}"
             };
         }
 
@@ -120,7 +120,7 @@ namespace Google.Cloud.Spanner
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.Insert,
                 TargetTable = databaseTableName,
-                CommandText = $"{s_insertCommand} {databaseTableName}"
+                CommandText = $"{InsertCommand} {databaseTableName}"
             };
         }
 
@@ -146,7 +146,7 @@ namespace Google.Cloud.Spanner
             return new SpannerCommandTextBuilder {
                 SpannerCommandType = SpannerCommandType.Update,
                 TargetTable = databaseTableName,
-                CommandText = $"{s_updateCommand} {databaseTableName}"
+                CommandText = $"{UpdateCommand} {databaseTableName}"
             };
         }
 
