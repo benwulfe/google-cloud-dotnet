@@ -46,6 +46,14 @@ namespace Google.Cloud.Spanner
             _commandTimeout = (int)ConnectionPoolOptions.Instance.Timeout.TotalSeconds;
         }
 
+        private SpannerCommand(
+            SpannerConnection connection,
+            SpannerTransaction transaction,
+            SpannerParameterCollection parameters) : this() {
+            SpannerConnection = connection;
+            _transaction = transaction;
+            Parameters = parameters;
+        }
         /// <summary>
         /// </summary>
         /// <param name="commandTextBuilder"></param>
@@ -54,14 +62,12 @@ namespace Google.Cloud.Spanner
         /// <param name="parameters"></param>
         public SpannerCommand(SpannerCommandTextBuilder commandTextBuilder, SpannerConnection connection,
             SpannerTransaction transaction = null, SpannerParameterCollection parameters = null)
+            : this(connection, transaction, parameters)
         {
             GaxPreconditions.CheckNotNull(commandTextBuilder, nameof(commandTextBuilder));
             GaxPreconditions.CheckNotNull(connection, nameof(connection));
 
             SpannerCommandTextBuilder = commandTextBuilder;
-            SpannerConnection = connection;
-            _transaction = transaction;
-            Parameters = parameters;
         }
 
         /// <summary>
@@ -96,7 +102,7 @@ namespace Google.Cloud.Spanner
             get { return CommandType.Text; }
             set
             {
-                if (!Equals(value, CommandType.Text))
+                if (value != CommandType.Text)
                     throw new NotSupportedException("Cloud Spanner only supports CommandType.Text.");
             }
         }
@@ -106,7 +112,7 @@ namespace Google.Cloud.Spanner
 
         /// <summary>
         /// </summary>
-        public new SpannerParameterCollection Parameters { get; private set; }
+        public new SpannerParameterCollection Parameters { get; }
 
         /// <summary>
         /// </summary>
@@ -120,7 +126,8 @@ namespace Google.Cloud.Spanner
             {
                 if (value != UpdateRowSource.None)
                 {
-                    throw new NotSupportedException("UpdatedRowSource is not supported in Cloud Spanner.");
+                    throw new NotSupportedException("Cloud Spanner does not support updating datasets on update/insert queries."
+                        + " Please use UUIDs instead of auto increment columns, which can be created on the client.");
                 }
             }
         }
@@ -128,6 +135,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         protected override DbConnection DbConnection
         {
+            //TODO(benwu): update to use newer lambda forms for get/set. ditto for other places.
             get { return SpannerConnection; }
             set { SpannerConnection = (SpannerConnection) value; }
         }
@@ -151,26 +159,19 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public object Clone()
         {
-            return new SpannerCommand {
+            return new SpannerCommand (SpannerConnection, _transaction, Parameters ) {
                 DesignTimeVisible = DesignTimeVisible,
-                Parameters = Parameters,
-                SpannerConnection = SpannerConnection,
                 SpannerCommandTextBuilder = SpannerCommandTextBuilder,
                 CommandTimeout = CommandTimeout
             };
         }
 
         /// <inheritdoc />
-        public override void Cancel()
-        {
-            _synchronousCancellationTokenSource.Cancel();
-        }
+        public override void Cancel() => _synchronousCancellationTokenSource.Cancel();
 
         /// <inheritdoc />
-        public override int ExecuteNonQuery()
-        {
-            return ExecuteNonQueryAsync(_synchronousCancellationTokenSource.Token).Result;
-        }
+        public override int ExecuteNonQuery() => ExecuteNonQueryAsync(_synchronousCancellationTokenSource.Token).ResultWithUnwrappedExceptions();
+
 
         /// <inheritdoc />
         public override async Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken)
@@ -179,12 +180,9 @@ namespace Google.Cloud.Spanner
             if (SpannerConnection == null)
                 throw new InvalidOperationException(
                     "You must assign a SpannerConnection to this command to execute it.");
-            if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Delete
-                && SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Insert
-                && SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.InsertOrUpdate
-                && SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Update)
+            if (SpannerCommandTextBuilder.SpannerCommandType == SpannerCommandType.Select)
                 throw new InvalidOperationException(
-                    "You can only call ExecuteReader on a Delete, Insert, InsertUpdate, or Update Command");
+                    "You can only call ExecuteNonQueryAsync on a Delete, Insert, InsertUpdate, or Update Command");
             if (!SpannerConnection.IsOpen)
                 await SpannerConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             if (!SpannerConnection.IsOpen)
@@ -193,50 +191,51 @@ namespace Google.Cloud.Spanner
 
             // Execute the command.
             var mutations = new List<Mutation>();
-            if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Delete)
-            {
-                var w = new Mutation.Types.Write {Table = SpannerCommandTextBuilder.TargetTable};
-                w.Columns.AddRange(Parameters.Cast<SpannerParameter>().Select(x => x.SourceColumn ?? x.ParameterName));
-                w.Values.Add(new ListValue {
-                    Values = {Parameters.Cast<SpannerParameter>().Select(x => TypeMap.ToValue(x.Value, x.TypeCode))}
-                });
-                switch (SpannerCommandTextBuilder.SpannerCommandType)
-                {
+            if (SpannerCommandTextBuilder.SpannerCommandType != SpannerCommandType.Delete) {
+                var w = new Mutation.Types.Write {
+                    Table = SpannerCommandTextBuilder.TargetTable,
+                    Columns = {
+                        Parameters.Cast<SpannerParameter>()
+                            .Select(x => x.SourceColumn ?? x.ParameterName)
+                    },
+                    Values = {
+                        new ListValue {
+                            Values = {
+                                Parameters.Cast<SpannerParameter>()
+                                    .Select(x => TypeMap.ToValue(x.Value, x.TypeCode))
+                            }
+                        }
+                    }
+                };
+                switch (SpannerCommandTextBuilder.SpannerCommandType) {
                     case SpannerCommandType.Update:
-                        mutations.Add(new Mutation {
-                            Update = w
-                        });
+                        mutations.Add(new Mutation {Update = w});
                         break;
                     case SpannerCommandType.Insert:
-                        mutations.Add(new Mutation {
-                            Insert = w
-                        });
+                        mutations.Add(new Mutation {Insert = w});
                         break;
                     case SpannerCommandType.InsertOrUpdate:
-                        mutations.Add(new Mutation {
-                            InsertOrUpdate = w
-                        });
+                        mutations.Add(new Mutation {InsertOrUpdate = w});
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
-            }
-            else
-            {
-                var w = new Mutation.Types.Delete {Table = SpannerCommandTextBuilder.TargetTable};
-                w.KeySet.Keys.Add(new ListValue {
-                    Values = {Parameters.Cast<SpannerParameter>().Select(x => TypeMap.ToValue(x.Value, x.TypeCode))}
-                });
-                switch (SpannerCommandTextBuilder.SpannerCommandType)
-                {
-                    case SpannerCommandType.Delete:
-                        mutations.Add(new Mutation {
-                            Delete = w
-                        });
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+            } else {
+                var w = new Mutation.Types.Delete {
+                    Table = SpannerCommandTextBuilder.TargetTable,
+                    KeySet =
+                        new KeySet {
+                            Keys = {
+                                new ListValue {
+                                    Values = {
+                                        Parameters.Cast<SpannerParameter>()
+                                            .Select(x => TypeMap.ToValue(x.Value, x.TypeCode))
+                                    }
+                                }
+                            }
+                        }
+                };
+                mutations.Add(new Mutation {Delete = w});
             }
 
             // Make the request.  This will commit immediately or not depending on whether a transaction was explicitly created.
@@ -249,7 +248,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override object ExecuteScalar()
         {
-            return ExecuteScalarAsync(_synchronousCancellationTokenSource.Token).Result;
+            return ExecuteScalarAsync(_synchronousCancellationTokenSource.Token).ResultWithUnwrappedExceptions();
         }
 
         /// <summary>
@@ -312,7 +311,7 @@ namespace Google.Cloud.Spanner
         protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
         {
             ValidateCommandBehavior(behavior);
-            return ExecuteDbDataReaderAsync(behavior, _synchronousCancellationTokenSource.Token).Result;
+            return ExecuteDbDataReaderAsync(behavior, _synchronousCancellationTokenSource.Token).ResultWithUnwrappedExceptions();
         }
 
         /// <inheritdoc />
@@ -338,8 +337,7 @@ namespace Google.Cloud.Spanner
             if (Parameters?.Count > 0)
             {
                 request.Params = new Struct();
-                Parameters.FillSpannerInternalValues(request.Params.Fields);
-                Parameters.FillSpannerInternalTypes(request.ParamTypes);
+                Parameters.FillSpannerInternalValues(request.Params.Fields, request.ParamTypes);
             }
 
             // Execute the command.
@@ -354,19 +352,22 @@ namespace Google.Cloud.Spanner
 
         internal ISpannerTransaction GetSpannerTransaction()
         {
-            if (_transaction != null)
-                return _transaction;
-            return SpannerConnection.GetDefaultTransaction();
+            return _transaction ?? SpannerConnection.GetDefaultTransaction();
         }
 
         private void ValidateCommandBehavior(CommandBehavior behavior)
         {
-            switch (behavior)
+            if ((behavior & CommandBehavior.KeyInfo) == CommandBehavior.KeyInfo)
             {
-                case CommandBehavior.KeyInfo:
-                case CommandBehavior.SchemaOnly:
-                case CommandBehavior.SequentialAccess:
-                    throw new NotSupportedException($"CommandBehavior {behavior} is not supported by Cloud Spanner.");
+                throw new NotSupportedException($"CommandBehavior KeyInfo is not supported by Cloud Spanner.");
+            }
+            if ((behavior & CommandBehavior.SchemaOnly) == CommandBehavior.SchemaOnly)
+            {
+                throw new NotSupportedException($"CommandBehavior SchemaOnly is not supported by Cloud Spanner.");
+            }
+            if ((behavior & CommandBehavior.SequentialAccess) == CommandBehavior.SequentialAccess)
+            {
+                throw new NotSupportedException($"CommandBehavior SequentialAccess is not supported by Cloud Spanner.");
             }
         }
     }

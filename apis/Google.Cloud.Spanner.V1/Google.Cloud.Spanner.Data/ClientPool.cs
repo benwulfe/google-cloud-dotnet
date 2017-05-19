@@ -73,6 +73,8 @@ namespace Google.Cloud.Spanner
         {
             private readonly ClientPoolKey _key;
             private SpannerClient _client;
+            private volatile Task<SpannerClient> _creationTask;
+            private readonly object _sync = new object();
 
             public ClientPoolEntry(ClientPoolKey key)
             {
@@ -87,12 +89,24 @@ namespace Google.Cloud.Spanner
                     var endpoint = _key.Endpoint ?? SpannerClient.DefaultEndpoint;
                     if (_key.Credential != null)
                     {
-                        var channel = new Channel(endpoint.Host, endpoint.Port, _key.Credential.ToChannelCredentials());
-                        _client = SpannerClient.Create(channel);
+                        lock (_sync) {
+                            if (_client == null) {
+                                var channel = new Channel(endpoint.Host,
+                                    endpoint.Port,
+                                    _key.Credential.ToChannelCredentials());
+                                _client = SpannerClient.Create(channel);
+                            }
+                        }
                     }
                     else
                     {
-                        _client = await SpannerClient.CreateAsync(endpoint).ConfigureAwait(false);
+                        lock (_sync) {
+                            if (_creationTask == null || _creationTask.IsFaulted) {
+                                _creationTask = SpannerClient.CreateAsync(endpoint);
+                            }
+                        }
+                        // await needs to be done outside of the monitor.
+                        _client = await _creationTask.ConfigureAwait(false);
                     }
                 }
 
