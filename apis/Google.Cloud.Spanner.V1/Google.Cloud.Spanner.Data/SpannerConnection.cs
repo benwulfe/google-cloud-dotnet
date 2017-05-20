@@ -379,7 +379,7 @@ namespace Google.Cloud.Spanner
         protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
         {
             isolationLevel.AssertOneOf(nameof(isolationLevel), IsolationLevel.Serializable, IsolationLevel.Unspecified);
-            return BeginTransactionAsync().Result;
+            return BeginTransactionAsync().ResultWithUnwrappedExceptions();
         }
 
         /// <inheritdoc />
@@ -479,7 +479,7 @@ namespace Google.Cloud.Spanner
                                     // we need to make sure the refcnt is >0 before setting _sharedSession.
                                     // or else the session could again be stolen from us by another transaction.
                                     Interlocked.Increment(ref _sessionRefCount);
-                                    _sharedSession = t.Result;
+                                    _sharedSession = t.ResultWithUnwrappedExceptions();
                                 }
                             }, CancellationToken.None);
                         }

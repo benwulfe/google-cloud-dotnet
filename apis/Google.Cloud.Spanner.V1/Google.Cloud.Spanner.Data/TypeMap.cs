@@ -30,6 +30,11 @@ namespace Google.Cloud.Spanner
             return ConvertToClrType(wireValue, spannerType, spannerType?.Code.GetDefaultClrTypeFromSpannerType());
         }
 
+        public static T ConvertToClrType<T>(this Value wireValue,
+            V1.Type spannerType) {
+            return (T) ConvertToClrType(wireValue, spannerType, typeof(T));
+        }
+
         public static object ConvertToClrType(this Value wireValue, V1.Type spannerType, System.Type targetClrType)
         {
             //extra supported conversions that are modifications of the "core" versions but may have loss of precision.

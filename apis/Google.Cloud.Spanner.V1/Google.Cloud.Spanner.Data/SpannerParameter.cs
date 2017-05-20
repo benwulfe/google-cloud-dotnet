@@ -28,9 +28,6 @@ namespace Google.Cloud.Spanner
         , ICloneable
 #endif
     {
-        private readonly ParameterDirection _direction = ParameterDirection.Input;
-        private string _sourceColumn;
-
         private string _spannerColumnName;
         private object _value;
 
@@ -44,21 +41,14 @@ namespace Google.Cloud.Spanner
         /// </summary>
         /// <param name="spannerColumnName"></param>
         /// <param name="type"></param>
-        public SpannerParameter(string spannerColumnName, SpannerDbType type)
+        /// <param name="sourceColumn"></param>
+        /// <param name="size"></param>
+        public SpannerParameter(string spannerColumnName, SpannerDbType type, string sourceColumn = null, int size = 0)
         {
             _spannerColumnName = spannerColumnName;
             TypeCode = type.GetSpannerTypeCode();
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <param name="spannerColumnName"></param>
-        /// <param name="type"></param>
-        /// <param name="sourceColumn"></param>
-        public SpannerParameter(string spannerColumnName, SpannerDbType type, string sourceColumn) : this(
-            spannerColumnName, type)
-        {
-            _sourceColumn = sourceColumn;
+            SourceColumn = sourceColumn;
+            Size = size;
         }
 
         /// <inheritdoc />
@@ -71,7 +61,7 @@ namespace Google.Cloud.Spanner
         /// <inheritdoc />
         public override ParameterDirection Direction
         {
-            get { return _direction; }
+            get { return ParameterDirection.Input; }
             set { throw new InvalidOperationException("Spanner does not support anything except input parameters."); }
         }
 
@@ -86,20 +76,10 @@ namespace Google.Cloud.Spanner
         }
 
         /// <inheritdoc />
-        public override byte Precision { get; set; }
-
-        /// <inheritdoc />
-        public override byte Scale { get; set; }
-
-        /// <inheritdoc />
         public override int Size { get; set; }
 
         /// <inheritdoc />
-        public override string SourceColumn
-        {
-            get { return _sourceColumn; }
-            set { _sourceColumn = value; }
-        }
+        public override string SourceColumn { get; set; }
 
         /// <inheritdoc />
         public override bool SourceColumnNullMapping { get; set; } = true;

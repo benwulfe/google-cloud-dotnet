@@ -20,7 +20,7 @@ namespace Google.Cloud.Spanner
                 if (sw != null)
                     Logger.LogPerformanceCounterFn($"{name}.Duration", x => sw.ElapsedMilliseconds);
             }
-            catch (Exception e) when (SpannerException.TryTranslateRpcException(e, out translatedException))
+            catch (Exception e) when ((translatedException = SpannerException.TryTranslateRpcException(e)) != null)
             {
                 throw translatedException;
             }
@@ -49,7 +49,7 @@ namespace Google.Cloud.Spanner
                     Logger.LogPerformanceCounterFn($"{name}.Duration", x => sw.ElapsedMilliseconds);
                 return result;
             }
-            catch (Exception e) when (SpannerException.TryTranslateRpcException(e, out translatedException))
+            catch (Exception e) when ((translatedException = SpannerException.TryTranslateRpcException(e)) != null)
             {
                 throw translatedException;
             }

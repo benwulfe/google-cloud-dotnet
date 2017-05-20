@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Google.Cloud.Spanner.V1.Logging;
 using Grpc.Core;
@@ -22,8 +23,36 @@ namespace Google.Cloud.Spanner
     /// <summary>
     /// Represents an error communicating with the Spanner database.
     /// </summary>
-    public sealed class SpannerException : Exception
-    {
+    public sealed class SpannerException : Exception {
+
+        private static readonly Dictionary<ErrorCode, string> s_errorMessageTable =
+            new Dictionary<ErrorCode, string>() {
+                {ErrorCode.Cancelled, "The operation was canceled."},
+                {ErrorCode.InvalidArgument, "An invalid argument was sent to Spanner."},
+                {ErrorCode.DeadlineExceeded, "The operation deadline was exceeded."},
+                {ErrorCode.NotFound, "Object not found."},
+                {ErrorCode.AlreadyExists, "Object already exists."}, {
+                    ErrorCode.PermissionDenied,
+                    "Insufficient permission to execute the specified operation."
+                },
+                {ErrorCode.Unauthenticated, "Invalid authentication credentials for the operation."},
+                {ErrorCode.ResourceExhausted, "Resources have been exhausted."}, {
+                    ErrorCode.FailedPrecondition,
+                    "Operation was rejected because the system is not in a state required for the operation's execution."
+                },
+                {ErrorCode.Aborted, "The operation was aborted."},
+                {ErrorCode.OutOfRange, "Operation was attempted past the valid range."}, {
+                    ErrorCode.Unimplemented,
+                    "Operation is not implemented or not supported/enabled in this service."
+                },
+                {ErrorCode.Internal, "Internal error."}, {
+                    ErrorCode.Unavailable,
+                    "The service is currently unavailable.  This is a most likely a transient condition."
+                },
+                {ErrorCode.DataLoss, "Unrecoverable data loss or corruption."},
+                {ErrorCode.Unknown, "An unknown error occurred."}
+            };
+
         /// <summary>
         /// This class is a thin conversion around a grpc exception, with the additional
         /// information of whether the operation is retryable based on the resulting error.
@@ -31,22 +60,18 @@ namespace Google.Cloud.Spanner
         /// <param name="code"></param>
         /// <param name="innerException"></param>
         internal SpannerException(ErrorCode code, RpcException innerException)
-            : base(GetMessageFromErrorCode(code), innerException)
-        {
+            : base(GetMessageFromErrorCode(code), innerException) {
             Logger.LogPerformanceCounterFn("SpannerException.Count", x => x + 1);
             ErrorCode = code;
         }
 
-        internal SpannerException(ErrorCode code, string message)
-            : base(message)
-        {
+        internal SpannerException(ErrorCode code, string message) : base(message) {
             Logger.LogPerformanceCounterFn("SpannerException.Count", x => x + 1);
             ErrorCode = code;
         }
 
         internal SpannerException(RpcException innerException)
-            : this(ConvertFromStatusCode(innerException.Status.StatusCode), innerException)
-        {
+            : this(ConvertFromStatusCode(innerException.Status.StatusCode), innerException) {
         }
 
         /// <summary>
@@ -55,12 +80,9 @@ namespace Google.Cloud.Spanner
 
         /// <summary>
         /// </summary>
-        public bool IsRetryable
-        {
-            get
-            {
-                switch (ErrorCode)
-                {
+        public bool IsRetryable {
+            get {
+                switch (ErrorCode) {
                     case ErrorCode.DeadlineExceeded:
                     case ErrorCode.Aborted:
                     case ErrorCode.Unavailable:
@@ -71,103 +93,35 @@ namespace Google.Cloud.Spanner
             }
         }
 
-        internal static bool TryTranslateRpcException(Exception possibleRpcException,
-            out SpannerException spannerException)
-        {
-            spannerException = null;
+        internal static SpannerException TryTranslateRpcException(Exception possibleRpcException) {
+            SpannerException spannerException = null;
             var rpcException = possibleRpcException as RpcException;
             if (rpcException != null)
                 spannerException = new SpannerException(rpcException);
             var aggregateException = possibleRpcException as AggregateException;
             if (aggregateException?.InnerExceptions != null)
-                spannerException = (SpannerException) aggregateException.InnerExceptions
-                    .FirstOrDefault(x => x is SpannerException);
+                spannerException =
+                    (SpannerException)
+                    aggregateException.InnerExceptions.FirstOrDefault(x => x is SpannerException);
 
-            return spannerException != null;
+            return spannerException;
         }
 
-        private static ErrorCode ConvertFromStatusCode(StatusCode statusCode)
-        {
-            switch (statusCode)
-            {
+        private static ErrorCode ConvertFromStatusCode(StatusCode statusCode) {
+            switch (statusCode) {
                 case StatusCode.OK:
-                case StatusCode.Unknown:
                     return ErrorCode.Unknown;
-                case StatusCode.Cancelled:
-                    return ErrorCode.Cancelled;
-                case StatusCode.InvalidArgument:
-                    return ErrorCode.InvalidArgument;
-                case StatusCode.DeadlineExceeded:
-                    return ErrorCode.DeadlineExceeded;
-                case StatusCode.NotFound:
-                    return ErrorCode.NotFound;
-                case StatusCode.AlreadyExists:
-                    return ErrorCode.AlreadyExists;
-                case StatusCode.PermissionDenied:
-                    return ErrorCode.PermissionDenied;
-                case StatusCode.Unauthenticated:
-                    return ErrorCode.Unauthenticated;
-                case StatusCode.ResourceExhausted:
-                    return ErrorCode.ResourceExhausted;
-                case StatusCode.FailedPrecondition:
-                    return ErrorCode.FailedPrecondition;
-                case StatusCode.Aborted:
-                    return ErrorCode.Aborted;
-                case StatusCode.OutOfRange:
-                    return ErrorCode.OutOfRange;
-                case StatusCode.Unimplemented:
-                    return ErrorCode.Unimplemented;
-                case StatusCode.Internal:
-                    return ErrorCode.Internal;
-                case StatusCode.Unavailable:
-                    return ErrorCode.Unavailable;
-                case StatusCode.DataLoss:
-                    return ErrorCode.DataLoss;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(statusCode), statusCode, null);
+                    return (ErrorCode) (int) statusCode;
             }
         }
 
-        private static string GetMessageFromErrorCode(ErrorCode errorCode)
-        {
-            switch (errorCode)
-            {
-                case ErrorCode.Cancelled:
-                    return "The operation was canceled.";
-                case ErrorCode.InvalidArgument:
-                    return "An invalid argument was sent to Spanner.";
-                case ErrorCode.DeadlineExceeded:
-                    return "The operation deadline was exceeded.";
-                case ErrorCode.NotFound:
-                    return "Object not found.";
-                case ErrorCode.AlreadyExists:
-                    return "Object already exists.";
-                case ErrorCode.PermissionDenied:
-                    return "Insufficient permission to execute the specified operation.";
-                case ErrorCode.Unauthenticated:
-                    return "Invalid authentication credentials for the operation.";
-                case ErrorCode.ResourceExhausted:
-                    return "Resources have been exhausted.";
-                case ErrorCode.FailedPrecondition:
-                    return
-                        "Operation was rejected because the system is not in a state required for the operation's execution.";
-                case ErrorCode.Aborted:
-                    return "The operation was aborted.";
-                case ErrorCode.OutOfRange:
-                    return "Operation was attempted past the valid range.";
-                case ErrorCode.Unimplemented:
-                    return "Operation is not implemented or not supported/enabled in this service.";
-                case ErrorCode.Internal:
-                    return "Internal error.";
-                case ErrorCode.Unavailable:
-                    return "The service is currently unavailable.  This is a most likely a transient condition.";
-                case ErrorCode.DataLoss:
-                    return "Unrecoverable data loss or corruption.";
-                case ErrorCode.Unknown:
-                    return "An unknown error occurred.";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(errorCode), errorCode, null);
+        private static string GetMessageFromErrorCode(ErrorCode errorCode) {
+            string message;
+            if (!s_errorMessageTable.TryGetValue(errorCode, out message)) {
+                throw new ArgumentOutOfRangeException(nameof(errorCode), errorCode, null);
             }
+            return message;
         }
     }
 }
