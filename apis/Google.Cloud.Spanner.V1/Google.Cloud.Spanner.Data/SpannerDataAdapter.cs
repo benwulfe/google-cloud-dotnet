@@ -20,6 +20,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
 using System.Threading;
+using Google.Api.Gax;
 
 namespace Google.Cloud.Spanner
 {
@@ -181,7 +182,7 @@ namespace Google.Cloud.Spanner
             SpannerDataReader spannerDataReader = dataReader as SpannerDataReader;
             if (spannerDataReader != null && BuildUpdateCommands)
             {
-                var readerMetadata = spannerDataReader.GetMetadataAsync(CancellationToken.None).Result;
+                var readerMetadata = spannerDataReader.PopulateMetadataAsync(CancellationToken.None).ResultWithUnwrappedExceptions();
                 foreach (var field in readerMetadata.RowType.Fields)
                 {
                     _parsedParameterCollection.Add(
