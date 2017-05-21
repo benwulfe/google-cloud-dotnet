@@ -11,7 +11,8 @@ namespace Google.Cloud.Spanner
         /// <returns></returns>
         public static bool IsTransientSpannerFault(this Exception exception)
         {
-            SpannerException spannerException = SpannerException.TryTranslateRpcException(exception);
+            SpannerException spannerException = (exception as SpannerException)
+                  ?? SpannerException.TryTranslateRpcException(exception);
 
             return spannerException != null && spannerException.IsRetryable;
         }
