@@ -28,7 +28,7 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="request"></param>
         /// <param name="callSettings"></param>
         /// <returns></returns>
-        public virtual AsyncServerStreamingCall<PartialResultSet> ExecuteSqlStream(ExecuteSqlRequest request, CallSettings callSettings = null)
+        internal virtual AsyncServerStreamingCall<PartialResultSet> ExecuteSqlStream(ExecuteSqlRequest request, CallSettings callSettings = null)
         {
             throw new NotImplementedException();
         }
@@ -64,7 +64,7 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="request"></param>
         /// <param name="callSettings"></param>
         /// <returns></returns>
-        public override AsyncServerStreamingCall<PartialResultSet> ExecuteSqlStream(ExecuteSqlRequest request, CallSettings callSettings = null)
+        internal override AsyncServerStreamingCall<PartialResultSet> ExecuteSqlStream(ExecuteSqlRequest request, CallSettings callSettings = null)
         {
             Modify_ExecuteSqlRequest(ref request, ref callSettings);
             return _callExecuteSqlStream.Call(request, callSettings);

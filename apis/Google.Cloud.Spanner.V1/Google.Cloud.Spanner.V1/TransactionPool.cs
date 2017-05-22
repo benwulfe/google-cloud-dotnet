@@ -13,7 +13,7 @@ namespace Google.Cloud.Spanner.V1
     /// When requesting a pooled session, the request can include transactionoptions which
     /// is then used as a key in the sessionpool.
     /// </summary>
-    public static class TransactionPool
+    internal static class TransactionPool
     {
         // Holds transaction state on sessions, including the last created transaction and options used.
         static readonly ConcurrentDictionary<Session, SessionInfo> s_sessionInfoTable = new ConcurrentDictionary<Session, SessionInfo>();

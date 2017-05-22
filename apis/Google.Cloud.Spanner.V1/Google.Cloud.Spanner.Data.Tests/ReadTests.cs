@@ -120,5 +120,34 @@ namespace Google.Cloud.Spanner.Data.Tests
             Assert.True(exceptionCaught);
             Assert.True(rowsRead == -1);
         }
+
+        [Fact]
+        public async Task TestBadTableName()
+        {
+            // ReSharper disable once RedundantAssignment
+            int rowsRead = -1;
+            bool exceptionCaught = false;
+
+            try {
+                using (var connection = await _testFixture.GetTestDatabaseConnectionAsync()) {
+                    var cmd =
+                        connection.CreateSelectCommand("SELECT * FROM badjuju WHERE Key = 'k99'");
+                    using (var reader = await cmd.ExecuteReaderAsync()) {
+                        rowsRead = 0;
+                        while (await reader.ReadAsync()) {
+                            rowsRead++;
+
+                        }
+                    }
+                }
+            } catch (SpannerException e) {
+                exceptionCaught = true;
+                Assert.True(e.ErrorCode == ErrorCode.InvalidArgument);
+                Assert.False(e.IsTransientSpannerFault());
+            }
+
+            Assert.True(exceptionCaught);
+            Assert.True(rowsRead == 0);
+        }
     }
 }

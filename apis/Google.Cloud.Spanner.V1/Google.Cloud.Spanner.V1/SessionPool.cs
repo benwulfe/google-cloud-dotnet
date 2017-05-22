@@ -23,7 +23,7 @@ namespace Google.Cloud.Spanner.V1
     /// and it will incur a penalty on other spanner processes because it will be an hour before the server frees the session if 
     /// its not properly deleted.
     /// </summary>
-    public static class SessionPool
+    internal static class SessionPool
     {
         private static readonly TimeSpan s_shutDownTimer = TimeSpan.FromSeconds(60);
 

@@ -19,7 +19,7 @@ namespace Google.Cloud.Spanner.V1
     /// Provides streaming access to a Spanner SQL query that automatically retries, handles
     /// chunking and recoverable errors.
     /// </summary>
-    public sealed class ReliableStreamReader : IDisposable
+    internal sealed class ReliableStreamReader : IDisposable
     {
         private AsyncServerStreamingCall<PartialResultSet> _currentCall;
         private readonly object _sync = new object();
