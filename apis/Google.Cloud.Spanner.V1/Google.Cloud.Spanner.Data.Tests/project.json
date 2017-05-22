@@ -1,4 +1,4 @@
-﻿{
+{
   "buildOptions": {
     "keyFile": "../../GoogleApis.snk"
   },
@@ -9,19 +9,24 @@
     "Google.Cloud.ClientTesting": { "target": "project" },
     "xunit": "2.2.0-rc3-build3528",
     "Moq": "4.6.36-alpha",
-    "dotnet-test-xunit": "2.2.0-preview2-build1029"
+    "dotnet-test-xunit": "2.2.0-preview2-build1029",
+    "Google.Api.Gax.Grpc": "1.0.1",
+    "SpannerAdminDatabase": "1.0.0"
   },
   "testRunner": "xunit",
 
   "frameworks": {
-    "netcoreapp1.0": {
+    //"netcoreapp1.0": {
+    //  "dependencies": {
+    //    "Microsoft.NETCore.App": {
+    //      "version": "1.0.0",
+    //      "type": "platform"
+    //    }
+    //  }
+    //},
+    "net451": {
       "dependencies": {
-        "Microsoft.NETCore.App": {
-          "version": "1.0.0",
-          "type": "platform"
-        }
       }
-    },
-    "net451": {}
-  }
+      }
+    }
 }

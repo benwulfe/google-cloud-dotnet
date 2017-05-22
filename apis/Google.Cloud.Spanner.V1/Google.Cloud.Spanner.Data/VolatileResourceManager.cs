@@ -1,6 +1,7 @@
 ﻿#if NET45 || NET451
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
@@ -28,6 +29,16 @@ namespace Google.Cloud.Spanner
 
         public void Commit(Enlistment enlistment)
         {
+            if (_transaction != null && !_transaction.Mutations.Any())
+            {
+                //In the case where our resource manager doesn't have any mutations, it was a read,
+                //which we will no-op and allow through even if it was a two phase commit.
+                //This allows cases such as nested transactions where the inner transaction is a readonly
+                //timestamp bound read and doesn't have anything to commit.
+                Logger.Debug(() => "Received a COMMIT for a two phase commit but without changes.  This is allowed.");
+                enlistment.Done();
+                return;
+            }
             Logger.Warn(
                 () =>
                     "Got a Commit call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
@@ -47,6 +58,15 @@ namespace Google.Cloud.Spanner
 
         public void Prepare(PreparingEnlistment preparingEnlistment)
         {
+            if (_transaction != null && !_transaction.Mutations.Any()) {
+                //In the case where our resource manager doesn't have any mutations, it was a read,
+                //which we will no-op and allow through even if it was a two phase commit.
+                //This allows cases such as nested transactions where the inner transaction is a readonly
+                //timestamp bound read and doesn't have anything to commit.
+                Logger.Debug(() => "Received a PREPARE for a two phase commit but without changes.  This is allowed.");
+                preparingEnlistment.Prepared();
+                return;
+            }
             Logger.Warn(
                 () =>
                     "Got a Prepare call, which indicates two phase commit inside a transaction scope.  This is currently not supported in Spanner.");
