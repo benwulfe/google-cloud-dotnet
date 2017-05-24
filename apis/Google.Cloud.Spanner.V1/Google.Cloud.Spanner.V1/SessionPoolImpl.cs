@@ -8,7 +8,7 @@ using Google.Cloud.Spanner.V1.Logging;
 
 namespace Google.Cloud.Spanner.V1
 {
-    internal class SessionPoolImpl : IComparable
+    internal class SessionPoolImpl : IComparable<SessionPoolImpl>
     {
         //This is the maximum we will search for a matching transaction option session.
         //We'll normally not hit this, but this is to stop abnormal cases where almost all
@@ -37,7 +37,7 @@ namespace Google.Cloud.Spanner.V1
             {
                 entries = _sessionMruStack.ToArray();
             }
-            return Task.WhenAll(entries.Select(sessionpoolentry => EvictImmediately(sessionpoolentry.Session, CancellationToken.None)).ToArray());
+            return Task.WhenAll(entries.Select(sessionpoolentry => EvictImmediatelyAsync(sessionpoolentry.Session, CancellationToken.None)).ToArray());
         }
 
         private Task EvictSessionPoolEntry(Session session, CancellationToken cancellationToken)
@@ -46,7 +46,7 @@ namespace Google.Cloud.Spanner.V1
             return task.ContinueWith(async (delayTask, o) => 
             {
                 Logger.Debug(() => "Evict timer triggered.");
-                await EvictImmediately(session, cancellationToken);
+                await EvictImmediatelyAsync(session, cancellationToken);
             }, null, cancellationToken);
         }
 
@@ -55,7 +55,7 @@ namespace Google.Cloud.Spanner.V1
             Logger.LogPerformanceCounter("Session.PooledCount", () => s_activeSessionsPooled);
         }
 
-        private async Task EvictImmediately(Session session, CancellationToken cancellationToken)
+        private async Task EvictImmediatelyAsync(Session session, CancellationToken cancellationToken)
         {
             Logger.Debug(() => "Evicting a session from the pool.");
             SessionPoolEntry entry = default(SessionPoolEntry);
@@ -78,7 +78,7 @@ namespace Google.Cloud.Spanner.V1
 
         private bool TryPop(TransactionOptions options, out SessionPoolEntry entry)
         {
-            entry = new SessionPoolEntry();
+            entry = default(SessionPoolEntry);
             //we make a reasonable attempt at obtaining a session with the given transactionoptions.
             //but its not guaranteed.
             lock (_sessionMruStack)
@@ -184,10 +184,7 @@ namespace Google.Cloud.Spanner.V1
         {
             Logger.Debug(() => "Placing session back into the pool and starting the evict timer.");
             //start evict timer.
-            SessionPoolEntry entry = new SessionPoolEntry {
-                Session = session,
-                EvictTaskCancellationSource = new CancellationTokenSource()
-            };
+            SessionPoolEntry entry = new SessionPoolEntry(session, new CancellationTokenSource());
 
             if (SessionPool.UseTransactionWarming)
             {
@@ -199,9 +196,8 @@ namespace Google.Cloud.Spanner.V1
                 entry.EvictTaskCancellationSource.Token);
         }
 
-        public int CompareTo(object obj)
+        public int CompareTo(SessionPoolImpl other)
         {
-            SessionPoolImpl other = obj as SessionPoolImpl;
             if (other == null)
             {
                 return -1;

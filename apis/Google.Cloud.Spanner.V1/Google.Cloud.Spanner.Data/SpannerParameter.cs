@@ -62,7 +62,7 @@ namespace Google.Cloud.Spanner
         public override ParameterDirection Direction
         {
             get { return ParameterDirection.Input; }
-            set { throw new InvalidOperationException("Spanner does not support anything except input parameters."); }
+            set { throw new InvalidOperationException("Spanner only supports input parameters."); }
         }
 
         /// <inheritdoc />
