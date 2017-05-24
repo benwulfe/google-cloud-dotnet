@@ -13,13 +13,13 @@
 // limitations under the License.
 
 using System;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Google.Cloud.Spanner.Data.Tests
-{
-    public class ReadTests : IClassFixture<TestDatabaseFixture>
-    {
+namespace Google.Cloud.Spanner.Data.Tests {
+    public class ReadTests : IClassFixture<TestDatabaseFixture> {
         private readonly TestDatabaseFixture _testFixture;
 
         public ReadTests(TestDatabaseFixture testFixture) {
@@ -32,7 +32,9 @@ namespace Google.Cloud.Spanner.Data.Tests
             int rowsRead = -1;
 
             using (var connection = await _testFixture.GetTestDatabaseConnectionAsync()) {
-                var cmd = connection.CreateSelectCommand("SELECT * FROM "  + _testFixture.TestTable + " WHERE Key >= 'k99'");
+                var cmd =
+                    connection.CreateSelectCommand("SELECT * FROM " + _testFixture.TestTable
+                                                   + " WHERE Key >= 'k99'");
                 using (var reader = await cmd.ExecuteReaderAsync()) {
                     rowsRead = 0;
                     while (await reader.ReadAsync()) {
@@ -44,19 +46,17 @@ namespace Google.Cloud.Spanner.Data.Tests
         }
 
         [Fact]
-        public async Task TestPointRead()
-        {
+        public async Task TestPointRead() {
             // ReSharper disable once RedundantAssignment
             int rowsRead = -1;
 
-            using (var connection = await _testFixture.GetTestDatabaseConnectionAsync())
-            {
-                var cmd = connection.CreateSelectCommand("SELECT * FROM " + _testFixture.TestTable + " WHERE Key = 'k1'");
-                using (var reader = await cmd.ExecuteReaderAsync())
-                {
+            using (var connection = await _testFixture.GetTestDatabaseConnectionAsync()) {
+                var cmd =
+                    connection.CreateSelectCommand("SELECT * FROM " + _testFixture.TestTable
+                                                   + " WHERE Key = 'k1'");
+                using (var reader = await cmd.ExecuteReaderAsync()) {
                     rowsRead = 0;
-                    while (await reader.ReadAsync())
-                    {
+                    while (await reader.ReadAsync()) {
                         Assert.True(reader.GetString(0) == "k1");
                         Assert.True(reader.GetString(1) == "v1");
                         rowsRead++;
@@ -68,19 +68,17 @@ namespace Google.Cloud.Spanner.Data.Tests
         }
 
         [Fact]
-        public async Task TestPointReadEmpty()
-        {
+        public async Task TestPointReadEmpty() {
             // ReSharper disable once RedundantAssignment
             int rowsRead = -1;
 
-            using (var connection = await _testFixture.GetTestDatabaseConnectionAsync())
-            {
-                var cmd = connection.CreateSelectCommand("SELECT * FROM " + _testFixture.TestTable + " WHERE Key = 'k99'");
-                using (var reader = await cmd.ExecuteReaderAsync())
-                {
+            using (var connection = await _testFixture.GetTestDatabaseConnectionAsync()) {
+                var cmd =
+                    connection.CreateSelectCommand("SELECT * FROM " + _testFixture.TestTable
+                                                   + " WHERE Key = 'k99'");
+                using (var reader = await cmd.ExecuteReaderAsync()) {
                     rowsRead = 0;
-                    while (await reader.ReadAsync())
-                    {
+                    while (await reader.ReadAsync()) {
                         rowsRead++;
 
                     }
@@ -90,10 +88,9 @@ namespace Google.Cloud.Spanner.Data.Tests
         }
 
         [Fact]
-        public async Task TestBadDbName()
-        {
-            string connectionString = "Data Source=" + _testFixture.TestProjectName + "/" + _testFixture.TestInstanceName + "/"
-                                          + "badjuju";
+        public async Task TestBadDbName() {
+            string connectionString = "Data Source=" + _testFixture.TestProjectName + "/"
+                                      + _testFixture.TestInstanceName + "/" + "badjuju";
             // ReSharper disable once RedundantAssignment
             int rowsRead = -1;
             bool exceptionCaught = false;
@@ -122,8 +119,7 @@ namespace Google.Cloud.Spanner.Data.Tests
         }
 
         [Fact]
-        public async Task TestBadTableName()
-        {
+        public async Task TestBadTableName() {
             // ReSharper disable once RedundantAssignment
             int rowsRead = -1;
             bool exceptionCaught = false;
@@ -148,6 +144,66 @@ namespace Google.Cloud.Spanner.Data.Tests
 
             Assert.True(exceptionCaught);
             Assert.True(rowsRead == 0);
+        }
+
+        [Fact]
+        public async Task TestBadColumnName() {
+            // ReSharper disable once RedundantAssignment
+            int rowsRead = -1;
+            bool exceptionCaught = false;
+
+            try {
+                using (var connection = await _testFixture.GetTestDatabaseConnectionAsync()) {
+                    var cmd =
+                        connection.CreateSelectCommand("SELECT badjuju FROM "
+                                                       + _testFixture.TestTable);
+                    using (var reader = await cmd.ExecuteReaderAsync()) {
+                        rowsRead = 0;
+                        while (await reader.ReadAsync()) {
+                            rowsRead++;
+
+                        }
+                    }
+                }
+            } catch (SpannerException e) {
+                exceptionCaught = true;
+                Debug.WriteLine("TestBadColumnName: Caught error code:" + e.ErrorCode);
+                Assert.True(e.ErrorCode == ErrorCode.InvalidArgument);
+                Assert.False(e.IsTransientSpannerFault());
+            }
+
+            Assert.True(exceptionCaught);
+            Assert.True(rowsRead < 1);
+        }
+
+        [Fact]
+        public async Task TestCancelRead()
+        {
+            // ReSharper disable once RedundantAssignment
+            bool exceptionCaught = false;
+            try
+            {
+                using (var connection = await _testFixture.GetTestDatabaseConnectionAsync())
+                {
+                    var cmd =
+                        connection.CreateSelectCommand("SELECT * FROM " + _testFixture.TestTable);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+                        var task = reader.ReadAsync(cancellationTokenSource.Token);
+                        cancellationTokenSource.Cancel();
+                        await task;
+                    }
+                }
+            }
+            catch (OperationCanceledException e)
+            {
+                exceptionCaught = true;
+                Assert.False(e.IsTransientSpannerFault());
+            }
+
+            Assert.True(exceptionCaught);
         }
     }
 }
