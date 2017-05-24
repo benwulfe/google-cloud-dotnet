@@ -42,7 +42,7 @@ namespace Google.Cloud.Spanner.V1
             }
         }
 
-        internal static async Task<TResponse> CallWithRetry<TResponse>(
+        internal static async Task<TResponse> CallWithRetryAsync<TResponse>(
             this Func<Task<TResponse>> someMethod,
             CallSettings callSettings,
             IClock clock, IScheduler scheduler)

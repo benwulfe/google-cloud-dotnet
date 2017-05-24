@@ -69,7 +69,7 @@ namespace Google.Cloud.Spanner
         public override int FieldCount => PopulateMetadataAsync(CancellationToken.None).ResultWithUnwrappedExceptions().RowType.Fields.Count;
 
         /// <inheritdoc />
-        public override bool HasRows => _resultSet.HasData(CancellationToken.None).ResultWithUnwrappedExceptions();
+        public override bool HasRows => _resultSet.HasDataAsync(CancellationToken.None).ResultWithUnwrappedExceptions();
 
         /// <inheritdoc />
         public override bool IsClosed => _resultSet.IsClosed;
@@ -220,13 +220,13 @@ namespace Google.Cloud.Spanner
                     await PopulateMetadataAsync(cancellationToken).ConfigureAwait(false);
                     _innerList.Clear();
                     //read # values == # fields.
-                    var first = await _resultSet.Next(cancellationToken).ConfigureAwait(false);
+                    var first = await _resultSet.NextAsync(cancellationToken).ConfigureAwait(false);
                     if (first == null)
                         return false;
                     _innerList.Add(first);
                     //we expect to get full rows...
                     for (var i = 1; i < _metadata.RowType.Fields.Count; i++)
-                        _innerList.Add(await _resultSet.Next(cancellationToken).ConfigureAwait(false));
+                        _innerList.Add(await _resultSet.NextAsync(cancellationToken).ConfigureAwait(false));
 
                     return true;
                 },

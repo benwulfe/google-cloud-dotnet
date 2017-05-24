@@ -36,7 +36,7 @@ namespace Google.Cloud.Spanner.V1
             var info = s_sessionInfoTable.GetOrAdd(session, s => new SessionInfo {SpannerClient = client});
         
             //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
-            await info.WaitForPreWarm().ConfigureAwait(false);
+            await info.WaitForPreWarmAsync().ConfigureAwait(false);
             
             //now we see if we can return the prewarmed transaction.
             // a lot has to be correct for us to return the precreated transaction.
@@ -74,21 +74,21 @@ namespace Google.Cloud.Spanner.V1
         /// <returns></returns>
         public static Task SetImplicitTransactionAsync(this Session session)
         {
-            return RemoveFromTransactionPool(session);
+            return RemoveFromTransactionPoolAsync(session);
         }
 
         /// <summary>
         /// When a session is deleted or no longer used, this will remove it from the transaction pool.
         /// </summary>
         /// <param name="session"></param>
-        public static async Task RemoveFromTransactionPool(this Session session)
+        public static async Task RemoveFromTransactionPoolAsync(this Session session)
         {
             SessionInfo info;
             if (s_sessionInfoTable.TryGetValue(session, out info))
             {
                 //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
-                await info.WaitForPreWarm().ConfigureAwait(false);
-                if (info.ActiveTransaction != null && !info.ActiveTransaction.GetTransactionId().IsEmpty)
+                await info.WaitForPreWarmAsync().ConfigureAwait(false);
+                if (info.ActiveTransaction != null && !info.ActiveTransaction.Id.IsEmpty)
                 {
                     Session ignored;
                     s_activeTransactionTable.TryRemove(info.ActiveTransaction.GetTransactionId(), out ignored); //clear out old tx.
@@ -161,7 +161,7 @@ namespace Google.Cloud.Spanner.V1
             if (s_sessionInfoTable.TryGetValue(session, out info))
             {
                 //we should have already waited, but extra checking cannot hurt.
-                await info.WaitForPreWarm().ConfigureAwait(false);
+                await info.WaitForPreWarmAsync().ConfigureAwait(false);
                 if (info.ActiveTransaction == null
                     || info.ActiveTransaction.GetTransactionId().IsEmpty
                     || !Equals(info.ActiveTransaction.GetTransactionId(), transaction.GetTransactionId()))
@@ -195,7 +195,7 @@ namespace Google.Cloud.Spanner.V1
             public SpannerClient SpannerClient { get; set; }
             private Task PreWarmTask { get; set; }
 
-            public async Task WaitForPreWarm()
+            public async Task WaitForPreWarmAsync()
             {
                 try
                 {
@@ -214,7 +214,7 @@ namespace Google.Cloud.Spanner.V1
 
             public async Task CreateTransactionAsync(Session session, TransactionOptions options)
             {
-                await WaitForPreWarm().ConfigureAwait(false);  //this is a little redundant, but just to be sure.
+                await WaitForPreWarmAsync().ConfigureAwait(false);  //this is a little redundant, but just to be sure.
                 ActiveTransactionOptions = options;
                 await CreateTransactionImplAsync(session).ConfigureAwait(false);
             }
@@ -233,7 +233,7 @@ namespace Google.Cloud.Spanner.V1
             {
                 //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
                 //this is a little redundant, but just to be sure.
-                await WaitForPreWarm().ConfigureAwait(false);
+                await WaitForPreWarmAsync().ConfigureAwait(false);
                 // for now, we only prewarm readwrite transactions because the read transaction semantics are usually
                 // dependent on the time the transaction begins.
                 if (options!= null && options.ModeCase == TransactionOptions.ModeOneofCase.ReadWrite)

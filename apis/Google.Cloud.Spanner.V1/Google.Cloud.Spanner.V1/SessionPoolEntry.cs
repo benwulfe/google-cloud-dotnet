@@ -8,7 +8,13 @@ namespace Google.Cloud.Spanner.V1
 {
     internal struct SessionPoolEntry
     {
-        public Session Session { get; set; }
-        public CancellationTokenSource EvictTaskCancellationSource { get; set; }
+        public SessionPoolEntry(Session session, CancellationTokenSource evictCancellationTokenSource)
+        {
+            Session = session;
+            EvictTaskCancellationSource = evictCancellationTokenSource;
+        }
+
+        public Session Session { get; }
+        public CancellationTokenSource EvictTaskCancellationSource { get; }
     }
 }

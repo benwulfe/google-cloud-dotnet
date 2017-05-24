@@ -15,31 +15,32 @@ namespace Google.Cloud.Spanner.V1
     /// It performs pooling of sessions with an evict timer along with configurable settings to control the maximum
     /// number of pooled and active sessions.
     /// To create a session using the sessionpool, use the extension method on SpannerClient.
-    ///   var session = await spannerClient.CreateSessionFromPoolAsync(project, spannerInstance, database, cancellationtoken);
+    ///   var session = await SpannerClient.CreateSessionFromPoolAsync(project, spannerInstance, database, cancellationtoken);
     /// To release a session back to the sessionpool:
     ///   session.ReleaseToPool();
     /// If you use the SessionPool, you must make sure sessions are properly released back into the pool and are not simply GC'd.
     /// Allowing a session to GC will incur penalties on the current process as the session will count towards the maximum allowed
-    /// and it will incur a penalty on other spanner processes because it will be an hour before the server frees the session if 
-    /// its not properly deleted.
+    /// and it will incur a penalty on other Spanner processes because it will be an hour before the server frees the session if 
+    /// it's not properly deleted.
     /// </summary>
     internal static class SessionPool
     {
-        private static readonly TimeSpan s_shutDownTimer = TimeSpan.FromSeconds(60);
+        private static readonly TimeSpan s_shutDownTimeout = TimeSpan.FromSeconds(60);
 
         // This member holds information we'll use when the session later gets released.
-        private static readonly ConcurrentDictionary<Session, SessionPoolKey>
-            s_sessionsInUse = new ConcurrentDictionary<Session, SessionPoolKey>();
+        private static readonly ConcurrentDictionary<Session, SessionPoolKey> s_sessionsInUse =
+            new ConcurrentDictionary<Session, SessionPoolKey>();
 
         private static int s_sessionsCreating;
-        private static readonly ConcurrentQueue<TaskCompletionSource<int>> s_waitQueue = new ConcurrentQueue<TaskCompletionSource<int>>();
+        private static readonly ConcurrentQueue<TaskCompletionSource<int>> s_waitQueue =
+            new ConcurrentQueue<TaskCompletionSource<int>>();
         private static readonly object s_waitSync = new object();
 
-        private static ConcurrentDictionary<SessionPoolKey, SessionPoolImpl> GlobalPool { get; } =
-            new ConcurrentDictionary<SessionPoolKey, SessionPoolImpl>();
+        private static readonly ConcurrentDictionary<SessionPoolKey, SessionPoolImpl>
+            s_poolByClientAndDatabase = new ConcurrentDictionary<SessionPoolKey, SessionPoolImpl>();
         private static readonly object s_priorityListSync = new object();
-        private static SortedList<SessionPoolImpl, SessionPoolImpl> PriorityList { get; }
-            = new SortedList<SessionPoolImpl, SessionPoolImpl>();
+        private static readonly SortedList<SessionPoolImpl, SessionPoolImpl> s_priorityList =
+            new SortedList<SessionPoolImpl, SessionPoolImpl>();
 
         private static readonly ConcurrentDictionary<string, bool> s_blackListedSessions = new ConcurrentDictionary<string, bool>();
 
@@ -47,68 +48,79 @@ namespace Google.Cloud.Spanner.V1
         {
 #if NET45
             AppDomain.CurrentDomain.DomainUnload += (sender, args) =>
-            {
-                Task.Run(ReleaseAll).Wait(s_shutDownTimer);
-            };
 #endif
 #if NETSTANDARD1_5
             System.Runtime.Loader.AssemblyLoadContext.Default.Unloading += context =>
-            {
-                Task.Run(ReleaseAll).Wait(s_shutDownTimer);
-            };
 #endif
+                    Task.Run(ReleaseAll).Wait(s_shutDownTimeout);
         }
 
         private static Task WhenCanceled(this CancellationToken cancellationToken)
         {
             var tcs = new TaskCompletionSource<bool>();
-            cancellationToken.Register(s => ((TaskCompletionSource<bool>)s).SetResult(true), tcs);
+            cancellationToken.Register(s => ((TaskCompletionSource<bool>) s).SetResult(true), tcs);
             return tcs.Task;
         }
 
-        private static async Task StartSessionCreating(CancellationToken cancellationToken)
+        private static async Task StartSessionCreatingAsync(CancellationToken cancellationToken)
         {
+            TaskCompletionSource<int> signal = new TaskCompletionSource<int>();
+            var cancellationTask = cancellationToken.WhenCanceled();
+
             lock (s_waitSync)
             {
-                if (CurrentActiveSessions < MaximumActiveSessions)
+                //we check waitQ.IsEmpty to allow us to free a session slot and signal the Q
+                //in two separate steps (outside of a sync lock) to remove the possibliity
+                //that a race condition could cause fairness to suffer (like someone snuck in and
+                //allocated a session jumping in front of folks waiting in the Q).
+                if (CurrentActiveSessions < MaximumActiveSessions
+                    && s_waitQueue.IsEmpty)
                 {
                     s_sessionsCreating++;
                     return;
                 }
-            }
-            var canceledTask = cancellationToken.WhenCanceled();
-            //we need to block or throw because we are out of allocations.
-            while (true)
-            {
-                if (WaitOnResourcesExhausted)
+                if (!WaitOnResourcesExhausted)
                 {
-                    TaskCompletionSource<int> signal = new TaskCompletionSource<int>();
-                    s_waitQueue.Enqueue(signal);
-                    await Task.WhenAny(signal.Task, canceledTask).ConfigureAwait(false);
-                    cancellationToken.ThrowIfCancellationRequested();
+                    throw new RpcException(new Status(StatusCode.ResourceExhausted,
+                        "Number of available Sessions exhausted."));
+                }
+                //we force the current request to get in line so that allocation is fair.
+                s_waitQueue.Enqueue(signal);
+            }
+            //we need to block or throw because we are out of allocations.
+            await Task.WhenAny(signal.Task, cancellationTask).ConfigureAwait(false);
+            if (cancellationTask.IsCanceled)
+            {
+                if (signal.Task.IsCompleted)
+                {
                     lock (s_waitSync)
                     {
-                        if (CurrentActiveSessions < MaximumActiveSessions)
-                        {
-                            s_sessionsCreating++;
-                            return;
-                        }
+                        //if somehow we got canceled AND the task was signled, lets fix the counter.
+                        s_sessionsCreating--;
+                        SignalAnyWaitingRequests();
                     }
                 }
-                else
-                {
-                    throw new RpcException(new Status(StatusCode.ResourceExhausted, "Number of available Sessions exhausted."));
-                }
+                cancellationToken.ThrowIfCancellationRequested();
             }
         }
 
-        private static void EndSessionCreating()
+        private static void EndSessionCreating(Session sessionResult, SessionPoolKey sessionPoolKey)
         {
             lock (s_waitSync)
             {
+                if (sessionResult != null)
+                {
+                    s_sessionsInUse.AddOrUpdate(sessionResult,
+                        x => sessionPoolKey,
+                        (x, y) => sessionPoolKey);
+                }
+
                 s_sessionsCreating--;
+                LogSessionsInUse();
+
+                //signal more queue entries (in fair order) if we still have room.
+                SignalAnyWaitingRequests();
             }
-            SignalAnyWaitingRequests();
         }
 
         /// <summary>
@@ -144,49 +156,53 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="options"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public static async Task<Session> CreateSessionFromPoolAsync(this SpannerClient spannerClient,
-            string project, string spannerInstance, string spannerDatabase, TransactionOptions options, CancellationToken cancellationToken)
+        public static async Task<Session> CreateSessionFromPoolAsync(
+            this SpannerClient spannerClient,
+            string project,
+            string spannerInstance,
+            string spannerDatabase,
+            TransactionOptions options,
+            CancellationToken cancellationToken)
         {
             project.ThrowIfNullOrEmpty(nameof(project));
             spannerInstance.ThrowIfNullOrEmpty(nameof(spannerInstance));
             spannerDatabase.ThrowIfNullOrEmpty(nameof(spannerDatabase));
-            
-            await StartSessionCreating(cancellationToken).ConfigureAwait(false);
+
+            await StartSessionCreatingAsync(cancellationToken).ConfigureAwait(false);
+            Session sessionResult = null;
+            SessionPoolKey sessionPoolKey = default(SessionPoolKey);
             try
             {
-                var sessionPoolKey = new SessionPoolKey {
-                    Client = spannerClient,
-                    Project = project,
-                    Instance = spannerInstance,
-                    Database = spannerDatabase
-                };
-                SessionPoolImpl targetPool = GlobalPool.GetOrAdd(sessionPoolKey, key => new SessionPoolImpl(key));
+                sessionPoolKey = new SessionPoolKey(spannerClient,
+                    project,
+                    spannerInstance,
+                    spannerDatabase);
+                SessionPoolImpl targetPool = s_poolByClientAndDatabase.GetOrAdd(sessionPoolKey,
+                    key => new SessionPoolImpl(key));
 
-                var session = await targetPool.AcquireSessionAsync(options, cancellationToken);
-                if (session != null)
-                {
-                    //refresh the mru list which tells us what sessions need to be trimmed from the pool when we want
-                    // to add another poolEntry.
-                    ReSortMru(targetPool);
-                    s_sessionsInUse.AddOrUpdate(session, x => sessionPoolKey, (x, y) => sessionPoolKey);
-                    LogSessionsInUse();
-                }
-                return session;
-            }
-            finally
+                sessionResult = await targetPool.AcquireSessionAsync(options, cancellationToken);
+                //refresh the mru list which tells us what sessions need to be trimmed from the pool when we want
+                // to add another poolEntry.
+                ReSortMru(targetPool);
+                return sessionResult;
+            } finally
             {
-                EndSessionCreating();
+                EndSessionCreating(sessionResult, sessionPoolKey);
             }
         }
 
         private static void SignalAnyWaitingRequests()
         {
-            TaskCompletionSource<int> waitingSessionRequest;
-            //if anyone is waiting, let them query for their session.
-            if (CurrentActiveSessions < MaximumActiveSessions
-                && s_waitQueue.TryDequeue(out waitingSessionRequest))
+            lock (s_waitSync)
             {
-                waitingSessionRequest.SetResult(0);
+                TaskCompletionSource<int> waitingSessionRequest;
+                //if anyone is waiting, let them query for their session.
+                if (CurrentActiveSessions < MaximumActiveSessions
+                    && s_waitQueue.TryDequeue(out waitingSessionRequest))
+                {
+                    s_sessionsCreating++;
+                    waitingSessionRequest.SetResult(0);
+                }
             }
         }
 
@@ -202,12 +218,12 @@ namespace Google.Cloud.Spanner.V1
         /// <param name="session"></param>
         /// <param name="client"></param>
         /// <returns></returns>
-        public static void ReleaseToPool(this SpannerClient client, Session session )
+        public static void ReleaseToPool(this SpannerClient client, Session session)
         {
             session.ThrowIfNull(nameof(session));
 
-            SessionPoolKey result;
-            if (s_sessionsInUse.TryRemove(session, out result))
+            SessionPoolKey poolKey;
+            if (s_sessionsInUse.TryRemove(session, out poolKey))
             {
                 LogSessionsInUse();
                 SignalAnyWaitingRequests();
@@ -217,10 +233,11 @@ namespace Google.Cloud.Spanner.V1
                     s_blackListedSessions.TryRemove(session.Name, out unused);
                     return;
                 }
-                SessionPoolImpl targetPool = GlobalPool.GetOrAdd(result,
+                SessionPoolImpl targetPool = s_poolByClientAndDatabase.GetOrAdd(poolKey,
                                              key => new SessionPoolImpl(key));
 
-                SpannerClient evictionClient = result.Client;
+
+                SpannerClient evictionClient = poolKey.Client;
                 Session evictionSession = null;
 
                 //Figure out if we want to pool this released session.
@@ -229,7 +246,7 @@ namespace Google.Cloud.Spanner.V1
                     targetPool.ReleaseSessionToPool(client, session);
                     if (CurrentPooledSessions > MaximumPooledSessions)
                     {
-                        var evictionPool = PriorityList.First().Value;
+                        var evictionPool = s_priorityList.First().Value;
                         evictionClient = evictionPool.Key.Client;
                         evictionSession = evictionPool.AcquireEvictionCandidate();
                         ReSortMru(evictionPool);
@@ -238,15 +255,22 @@ namespace Google.Cloud.Spanner.V1
                 }
                 if (evictionSession != null)
                 {
-                    Task.Run(() => EvictSession(evictionClient, evictionSession));
+                    Task.Run(() => EvictSessionAsync(evictionClient, evictionSession));
                 }
+            } else
+            {
+                Logger.Error(
+                    () =>
+                        "An attempt was made to release a session to the pool,"
+                        + " but the session was not originally allocated from the pool.");
             }
         }
 
-        private static async Task EvictSession(SpannerClient evictionClient, Session evictionSession)
+        private static async Task EvictSessionAsync(SpannerClient evictionClient,
+            Session evictionSession)
         {
-            await evictionSession.RemoveFromTransactionPool().ConfigureAwait(false);
-            await evictionClient.DeleteSessionAsync(evictionSession.GetSessionName());
+            await evictionSession.RemoveFromTransactionPoolAsync().ConfigureAwait(false);
+            await evictionClient.DeleteSessionAsync(evictionSession.GetSessionName()).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -254,7 +278,7 @@ namespace Google.Cloud.Spanner.V1
         /// </summary>
         /// <param name="session"></param>
         /// <returns></returns>
-        public static async Task Close(this Session session)
+        public static async Task CloseAsync(this Session session)
         {
             session.ThrowIfNull(nameof(session));
 
@@ -266,17 +290,18 @@ namespace Google.Cloud.Spanner.V1
                 await result.Client.DeleteSessionAsync(session.GetSessionName()).ConfigureAwait(false);
                 return;
             }
-            throw new InvalidOperationException("Close Session was not able to locate the provided session.");
+            throw new InvalidOperationException(
+                "Close Session was not able to locate the provided session.");
         }
 
         private static void ReSortMru(SessionPoolImpl targetPool)
         {
             lock (s_priorityListSync)
             {
-                if (PriorityList.Count > 1)
+                if (s_priorityList.Count > 1)
                 {
-                    PriorityList.Remove(targetPool);
-                    PriorityList.Add(targetPool, targetPool);
+                    s_priorityList.Remove(targetPool);
+                    s_priorityList.Add(targetPool, targetPool);
                 }
             }
         }
@@ -287,15 +312,25 @@ namespace Google.Cloud.Spanner.V1
         /// <returns></returns>
         public static Task ReleaseAll()
         {
-            var entries = GlobalPool.Values;
-            GlobalPool.Clear(); // ReleaseAll should not be called while other operations are starting.
-            return Task.WhenAll(entries.Select(sessionpool => sessionpool.ReleaseAllImpl()).ToArray());
+            var entries = s_poolByClientAndDatabase.Values;
+            s_poolByClientAndDatabase.Clear();
+                // ReleaseAll should not be called while other operations are starting.
+            return Task.WhenAll(entries.Select(sessionpool => sessionpool.ReleaseAllImpl()));
         }
 
         /// <summary>
         /// The current number of active sessions in use by the application.
         /// </summary>
-        public static int CurrentActiveSessions => s_sessionsInUse.Count + s_sessionsCreating;
+        public static int CurrentActiveSessions
+        {
+            get
+            {
+                lock (s_waitSync)
+                {
+                    return s_sessionsInUse.Count + s_sessionsCreating;
+                }
+            }
+        }
 
         /// <summary>
         /// The current number of sessions in the Session Pool.
