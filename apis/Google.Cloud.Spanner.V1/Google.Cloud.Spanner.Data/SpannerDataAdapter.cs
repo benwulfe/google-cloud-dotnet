@@ -200,7 +200,7 @@ namespace Google.Cloud.Spanner
             _builtUpdateCommand = null;
         }
 
-        private SpannerCommand BuildInsertCommand()
+        private SpannerCommand GetBuiltInsertCommand()
         {
             if (_builtInsertCommand != null)
             {
@@ -213,7 +213,7 @@ namespace Google.Cloud.Spanner
             return _builtInsertCommand;
         }
 
-        private SpannerCommand BuildUpdateCommand()
+        private SpannerCommand GetBuiltUpdateCommand()
         {
             if (_builtUpdateCommand != null)
             {
@@ -226,7 +226,7 @@ namespace Google.Cloud.Spanner
             return _builtUpdateCommand;
         }
 
-        private SpannerCommand BuildDeleteCommand()
+        private SpannerCommand GetBuiltDeleteCommand()
         {
             if (_builtDeleteCommand != null)
             {
@@ -251,16 +251,27 @@ namespace Google.Cloud.Spanner
                     throw new InvalidOperationException("You must set SpannderDataAdapter.UpdateTable to automatically generate update commands.");
                 }
 
+                // Note that we auto build the commands as a feature of the *Data adapter* versus a separate class.
+                // This is done for two reasons:
+                // a) We cannot create a "proper" DbCommandBuilder because DDL is not supported by Spanner.
+                //    This means any "SpannerCommandBuilder" would not live up to expectations and be castable
+                //    to DbCommandBuilder.
+                // b) The code for building these commands is both much simpler than othe providers and also
+                //    somewhat more limiting (it only supports simple table updates whereas other command builders
+                //    use TSQL or additional sql commands to inspect a query and determine the proper way to update it).
+                //    This means that the auto build feature has more limited use, but is still useful for
+                //    quickly getting started and achieving full CRUD on a table with only a single SQL Query + table name.
+                //    It also means the code for this support is significantly reduced and does not warrant its own class.
                 switch (rowUpdatingEventArgs.StatementType)
                 {
                     case StatementType.Insert:
-                        rowUpdatingEventArgs.Command = BuildInsertCommand();
+                        rowUpdatingEventArgs.Command = GetBuiltInsertCommand();
                         break;
                     case StatementType.Update:
-                        rowUpdatingEventArgs.Command = BuildUpdateCommand();
+                        rowUpdatingEventArgs.Command = GetBuiltUpdateCommand();
                         break;
                     case StatementType.Delete:
-                        rowUpdatingEventArgs.Command = BuildDeleteCommand();
+                        rowUpdatingEventArgs.Command = GetBuiltDeleteCommand();
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();
