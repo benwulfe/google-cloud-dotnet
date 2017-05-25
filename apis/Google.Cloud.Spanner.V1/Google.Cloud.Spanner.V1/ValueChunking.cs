@@ -43,6 +43,8 @@ namespace Google.Cloud.Spanner.V1
                     }
                     break;
                 case Value.KindOneofCase.ListValue:
+                    // As stated above, when merging a ListValue, we examine the last item in the list.
+                    // If that item is mergable, we then merge that item with the first item in the other list.
                     var childItemValue = thisValue.ListValue.Values.LastOrDefault();
                     int iterator = 0;
                     if (childItemValue.IsMergable())

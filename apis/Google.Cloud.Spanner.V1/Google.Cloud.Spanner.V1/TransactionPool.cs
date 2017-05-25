@@ -8,10 +8,10 @@ using Google.Protobuf;
 namespace Google.Cloud.Spanner.V1
 {
     /// <summary>
-    /// The TransactionPool works in conjuntion with the Session pool to warm pooled Sessions
+    /// The TransactionPool works in conjunction with the Session pool to warm pooled Sessions
     /// with the transaction semantics it last used (if appropriate).
-    /// When requesting a pooled session, the request can include transactionoptions which
-    /// is then used as a key in the sessionpool.
+    /// When requesting a pooled session, the request can include TransactionOptions which
+    /// is then used as a key in the SessionPool.
     /// </summary>
     internal static class TransactionPool
     {
@@ -22,7 +22,7 @@ namespace Google.Cloud.Spanner.V1
         static readonly ConcurrentDictionary<ByteString, Session> s_activeTransactionTable = new ConcurrentDictionary<ByteString, Session>();
 
         /// <summary>
-        /// Creates a transaction with the given transactoin options.
+        /// Creates a transaction with the given transaction options.
         /// Depending on the state of the session, this may or may not result in a request
         /// to Spanner over the network.
         /// </summary>
@@ -33,7 +33,7 @@ namespace Google.Cloud.Spanner.V1
         public static async Task<Transaction> BeginPooledTransactionAsync(this SpannerClient client, Session session,
             TransactionOptions options)
         {
-            var info = s_sessionInfoTable.GetOrAdd(session, s => new SessionInfo {SpannerClient = client});
+            var info = s_sessionInfoTable.GetOrAdd(session, s => new SessionInfo(client));
         
             //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
             await info.WaitForPreWarmAsync().ConfigureAwait(false);
@@ -43,9 +43,8 @@ namespace Google.Cloud.Spanner.V1
             // we have to have a valid transaction object.
             // it needs to exist in the activetransactiontable to indicate that it hasn't been closed
             // the options on it must equal the passed in options.
-            if (info.ActiveTransaction != null
-                && !info.ActiveTransaction.GetTransactionId().IsEmpty
-                && s_activeTransactionTable.ContainsKey(info.ActiveTransaction.GetTransactionId()))
+            if (info.HasActiveTransaction 
+                && s_activeTransactionTable.ContainsKey(info.ActiveTransaction.Id))
             {
                 if (info.ActiveTransactionOptions != null
                     && info.ActiveTransactionOptions.Equals(options))
@@ -58,7 +57,7 @@ namespace Google.Cloud.Spanner.V1
             }
 
             //ok, our cache hit didnt work for whatever reason.  Let's create a transaction with the given options and return it.
-            await info.CreateTransactionAsync(session, options);
+            await info.CreateTransactionAsync(session, options).ConfigureAwait(false);
             if (info.ActiveTransaction != null)
             {
                 s_activeTransactionTable.AddOrUpdate(info.ActiveTransaction.GetTransactionId(), session, (id, s) => session);
@@ -88,7 +87,7 @@ namespace Google.Cloud.Spanner.V1
             {
                 //we need to await for previous task completion anyway -- otherwise there is a bad race condition.
                 await info.WaitForPreWarmAsync().ConfigureAwait(false);
-                if (info.ActiveTransaction != null && !info.ActiveTransaction.Id.IsEmpty)
+                if (info.HasActiveTransaction)
                 {
                     Session ignored;
                     s_activeTransactionTable.TryRemove(info.ActiveTransaction.GetTransactionId(), out ignored); //clear out old tx.
@@ -124,7 +123,7 @@ namespace Google.Cloud.Spanner.V1
         public static Task PreWarmTransactionAsync(this SpannerClient client, Session session)
         {
             TransactionOptions options = session.GetLastUsedTransactionOptions();
-            var info = s_sessionInfoTable.GetOrAdd(session, s => new SessionInfo {SpannerClient = client});
+            var info = s_sessionInfoTable.GetOrAdd(session, s => new SessionInfo(client));
             return info.PreWarmAsync(session, options);
         }
 
@@ -162,9 +161,8 @@ namespace Google.Cloud.Spanner.V1
             {
                 //we should have already waited, but extra checking cannot hurt.
                 await info.WaitForPreWarmAsync().ConfigureAwait(false);
-                if (info.ActiveTransaction == null
-                    || info.ActiveTransaction.GetTransactionId().IsEmpty
-                    || !Equals(info.ActiveTransaction.GetTransactionId(), transaction.GetTransactionId()))
+                if (!info.HasActiveTransaction
+                    || !Equals(info.ActiveTransaction.Id, transaction.Id))
                 {
                     throw new InvalidOperationException("The transaction being committed was not found to have a valid entry.");
                 }
@@ -182,17 +180,24 @@ namespace Google.Cloud.Spanner.V1
             else
             {
                 throw new ArgumentException(
-                    "The given transaction was not found in the transaction pool. Only "
-                    +
-                    "use this method on Transactions returned from TransactionPoool.CreateTransactionAsync.");
+                    "The given transaction was not found in the transaction pool. Only " +
+                    "use this method on Transactions returned from TransactionPool." +
+                    "CreateTransactionAsync.");
             }
         }
 
         private class SessionInfo
         {
-            public Transaction ActiveTransaction { get; set; }
-            public TransactionOptions ActiveTransactionOptions { get; set; }
-            public SpannerClient SpannerClient { get; set; }
+            public SessionInfo(SpannerClient spannerClient)
+            {
+                SpannerClient = spannerClient;
+            }
+
+            public bool HasActiveTransaction
+                => ActiveTransaction != null && !ActiveTransaction.Id.IsEmpty;
+            public Transaction ActiveTransaction { get; private set; }
+            public TransactionOptions ActiveTransactionOptions { get; private set; }
+            public SpannerClient SpannerClient { get; }
             private Task PreWarmTask { get; set; }
 
             public async Task WaitForPreWarmAsync()
@@ -236,7 +241,7 @@ namespace Google.Cloud.Spanner.V1
                 await WaitForPreWarmAsync().ConfigureAwait(false);
                 // for now, we only prewarm readwrite transactions because the read transaction semantics are usually
                 // dependent on the time the transaction begins.
-                if (options!= null && options.ModeCase == TransactionOptions.ModeOneofCase.ReadWrite)
+                if (options?.ModeCase == TransactionOptions.ModeOneofCase.ReadWrite)
                 {
                     Logger.Debug(() => $"Pre-warming session transaction state. Mode={options.ModeCase}");
                     ActiveTransactionOptions = options;
