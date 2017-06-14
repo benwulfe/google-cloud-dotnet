@@ -366,7 +366,8 @@ namespace Google.Cloud.Spanner.Data
 
             // Make the request. This will commit immediately or not depending on whether a transaction was explicitly created.
             await GetSpannerTransaction().ExecuteMutationsAsync(mutations, cancellationToken)
-                .WithTimeout(TimeSpan.FromSeconds(CommandTimeout), "The timeout of the SpannerCommand was exceeded.");
+                .WithTimeout(TimeSpan.FromSeconds(CommandTimeout), "The timeout of the SpannerCommand was exceeded.")
+                .ConfigureAwait(false);
             // Return the number of records affected.
             return mutations.Count;
         }
