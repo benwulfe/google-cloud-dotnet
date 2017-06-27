@@ -19,6 +19,8 @@ using System.Collections;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Apis.Auth.OAuth2;
+using Google.Cloud.Spanner.V1;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -44,28 +46,75 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
 
         private readonly TestDatabaseFixture _testFixture;
 
-        //[Fact]
-        //public async Task TestReadDeadlineExceeded()
-        //{
-        //    Exception exceptionCaught = null;
-        //    long result = 0;
-        //    try
-        //    {
-        //        using (var connection = await _testFixture.GetTestDatabaseConnectionAsync())
-        //        {
-        //            var cmd =
-        //                connection.CreateSelectCommand("SELECT 1");
-        //            result = await cmd.ExecuteScalarAsync<long>();
-        //        }
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        exceptionCaught = e;
-        //    }
+        /// <summary>
+        /// This class ensures that the credential in TestDeadlineExceeded is seen as a new instance.
+        /// </summary>
+        private class CredentialWrapper : ITokenAccess
+        {
+            private readonly ITokenAccess _original;
 
-        //    Assert.NotNull(exceptionCaught);
-        //    Assert.Equal(0, result);
-        //}
+            public CredentialWrapper(ITokenAccess original)
+            {
+                _original = original;
+            }
+            /// <inheritdoc />
+            public Task<string> GetAccessTokenForRequestAsync(
+                string authUri = null,
+                CancellationToken cancellationToken = new CancellationToken())
+            {
+                return _original.GetAccessTokenForRequestAsync(authUri, cancellationToken);
+            }
+        }
+
+        [Fact]
+        public async Task TestDeadlineExceeded()
+        {
+            var oldTimeout = SpannerOptions.Instance.Timeout;
+            SpannerOptions.Instance.Timeout = TimeSpan.FromTicks(1);
+
+            try
+            {
+                //we use a new instance of a credential to force create a new spannerclient,
+                //which will cause the new options to be respected (ie timeout).
+                //normally setting timeout is only supported before creation of any client and cannot
+                //be changed due to the fact we pool clients.
+                var appDefaultCredentials = await GoogleCredential.GetApplicationDefaultAsync().ConfigureAwait(false);
+                if (appDefaultCredentials.IsCreateScopedRequired)
+                {
+                    appDefaultCredentials = appDefaultCredentials.CreateScoped(SpannerClient.DefaultScopes);
+                }
+
+                Exception exceptionCaught = null;
+                long result = 0;
+                try
+                {
+                    using (await _testFixture.GetTestDatabaseConnectionAsync())
+                    {
+                        using (var connection =
+                            new SpannerConnection(_testFixture.ConnectionString,
+                              new CredentialWrapper(appDefaultCredentials)))
+                        {
+                            var cmd =
+                                connection.CreateSelectCommand("SELECT 1");
+                            result = await cmd.ExecuteScalarAsync<long>();
+                        }
+                    }
+                }
+                catch (SpannerException e)
+                {
+                    exceptionCaught = e;
+                    Assert.Equal(ErrorCode.DeadlineExceeded, e.ErrorCode);
+                    Assert.True(e.IsTransientSpannerFault());
+                }
+
+                Assert.NotNull(exceptionCaught);
+                Assert.Equal(0, result);
+            }
+            finally
+            {
+                SpannerOptions.Instance.Timeout = oldTimeout;
+            }
+        }
 
         private async Task<T> ExecuteAsync<T>(string sql)
         {

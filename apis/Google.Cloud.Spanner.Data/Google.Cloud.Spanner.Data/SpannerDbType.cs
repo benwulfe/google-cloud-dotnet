@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Google.Cloud.Spanner.V1;
@@ -137,7 +138,13 @@ namespace Google.Cloud.Spanner.Data
 
         /// <summary>
         /// Creates an array of the specified type. This can be done on any arbitrary <see cref="SpannerDbType"/>.
+        /// You may use any type that implements IEnumerable as a source for the array.  The type of each
+        /// item is determined by <paramref name="elementType"/>.
+        /// When calling <see cref="SpannerDataReader.GetFieldValue(string)"/> the default type
+        /// is <see cref="ArrayList"/>. You may, however, specify any type that implements IList which
+        /// has a default constructor.
         /// </summary>
+        /// <param name="elementType">The type of each item in the array.</param>
         public static SpannerDbType ArrayOf(SpannerDbType elementType) =>
             new SpannerDbType(TypeCode.Array, elementType);
 
@@ -145,6 +152,12 @@ namespace Google.Cloud.Spanner.Data
         /// <summary>
         /// Creates a struct of the specified type.
         /// A struct has field names and field values.
+        /// You may use any type that implements IDictionary as a source for the array.
+        /// The ToString method will be called on each key of the IDictionary to generate each field name.
+        /// Each field value's type is determined by the given argument <paramref name="structMembers"/>.
+        /// When calling <see cref="SpannerDataReader.GetFieldValue(string)"/> the default type
+        /// is <see cref="Hashtable"/>. You may, however, specify any type that implements IDictionary which
+        /// has a default constructor.
         /// </summary>
         /// <param name="structMembers">A dictionary containing the field names and types of each member of the struct.</param>
         /// <returns></returns>

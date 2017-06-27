@@ -65,8 +65,8 @@ namespace Google.Cloud.Spanner.Data
 
         /// <summary>
         /// The maximum number of grpc channels used per credential.
-        /// Grpc channels are used in round robin fashion and can be used for multiple
-        /// <see cref="SpannerConnection"/> instances.
+        /// Grpc channels are used in round robin fashion and are assigned to
+        /// <see cref="SpannerConnection"/> instances on creation.
         /// </summary>
         public int MaximumGrpcChannels { get; set; } = 4;
 

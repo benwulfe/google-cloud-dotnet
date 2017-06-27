@@ -405,6 +405,6 @@ namespace Google.Cloud.Spanner.V1
         /// <summary>
         /// 
         /// </summary>
-        public static TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
+        public static TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(60);
     }
 }
