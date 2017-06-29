@@ -15,6 +15,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Google.Cloud.Spanner.V1;
 using Google.Protobuf.Collections;
 
@@ -87,6 +88,34 @@ namespace Google.Cloud.Spanner.Data
             {
                 StructMembers[field.Name] = FromProtobufType(field.Type);
             }
+        }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            if (ArrayElementType != null)
+            {
+                return $"ArrayOf({ArrayElementType})";
+            }
+            if (StructMembers != null)
+            {
+                StringBuilder s = new StringBuilder();
+                foreach (var keyValuePair in StructMembers)
+                {
+                    if (s.Length == 0)
+                    {
+                        s.Append("StructOf(");
+                    }
+                    else
+                    {
+                        s.Append(", ");
+                    }
+                    s.Append($"key:{keyValuePair.Key} type:{keyValuePair.Value}");
+                }
+                s.Append(")");
+                return s.ToString();
+            }
+            return TypeCode.ToString();
         }
 
         internal static SpannerDbType FromProtobufType(V1.Type type)
