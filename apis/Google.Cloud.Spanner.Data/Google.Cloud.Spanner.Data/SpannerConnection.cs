@@ -287,7 +287,7 @@ namespace Google.Cloud.Spanner.Data
         {
             if (client != null)
             {
-                ClientPool.ReleaseClient(
+                ClientPool.Default.ReleaseClient(
                     client,
                     _connectionStringBuilder.Credential,
                     _connectionStringBuilder.EndPoint);
@@ -421,7 +421,7 @@ namespace Google.Cloud.Spanner.Data
                     SpannerClient localClient = null;
                     try
                     {
-                        localClient = await ClientPool.AcquireClientAsync(
+                        localClient = await ClientPool.Default.AcquireClientAsync(
                                 _connectionStringBuilder.Credential,
                                 _connectionStringBuilder.EndPoint)
                             .ConfigureAwait(false);

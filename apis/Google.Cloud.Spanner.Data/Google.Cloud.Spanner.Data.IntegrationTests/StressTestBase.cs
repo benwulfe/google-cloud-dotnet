@@ -89,7 +89,7 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
             Logger.Instance.Info(s.ToString());
 
             s.Clear();
-            Assert.Equal(0, ClientPool.GetPoolInfo(s));
+            Assert.Equal(0, ClientPool.Default.GetPoolInfo(s));
             Logger.Instance.Info(s.ToString());
         }
     }
