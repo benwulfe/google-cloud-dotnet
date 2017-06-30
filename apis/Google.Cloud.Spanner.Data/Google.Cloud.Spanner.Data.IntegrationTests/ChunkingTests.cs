@@ -29,7 +29,7 @@ using Xunit.Sdk;
 
 namespace Google.Cloud.Spanner.Data.IntegrationTests
 {
-    [Collection("Spanner Integration Tests")]
+    [Collection(nameof(TestDatabaseFixture))]
     public class ChunkingTests
     {
         // ReSharper disable once UnusedParameter.Local
