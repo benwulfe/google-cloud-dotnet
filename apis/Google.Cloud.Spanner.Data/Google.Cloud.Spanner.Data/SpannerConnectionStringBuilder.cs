@@ -48,7 +48,7 @@ namespace Google.Cloud.Spanner.Data
         public string DataSource
         {
             get => GetValueOrDefault("Data Source");
-            private set => this["Data Source"] = ValidatedDataSource(value);
+            set => this["Data Source"] = ValidatedDataSource(value);
         }
 
         private bool ParseCurrentDataSource()
@@ -87,7 +87,7 @@ namespace Google.Cloud.Spanner.Data
         public string Host
         {
             get => GetValueOrDefault(nameof(Host), SpannerClient.DefaultEndpoint.Host);
-            private set => this[nameof(Host)] = value;
+            set => this[nameof(Host)] = value;
         }
 
         /// <summary>
@@ -111,7 +111,7 @@ namespace Google.Cloud.Spanner.Data
 
                 return result;
             }
-            private set => this[nameof(Port)] = value.ToString();
+            set => this[nameof(Port)] = value.ToString();
         }
 
         /// <summary>
@@ -168,6 +168,7 @@ namespace Google.Cloud.Spanner.Data
             connectionString.ThrowIfNullOrEmpty(nameof(connectionString));
             Credential = credential;
             ConnectionString = connectionString;
+            ValidatedDataSource(DataSource);
         }
 
         /// <summary>
