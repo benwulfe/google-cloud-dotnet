@@ -38,7 +38,15 @@ namespace Google.Cloud.Spanner.Data.Tests
 
         protected override void WriteLine(string message)
         {
-            TestOutputHelper?.WriteLine(message);
+            try
+            {
+                TestOutputHelper?.WriteLine(message);
+            }
+            catch (Exception)
+            {
+                //Eat the exception.  This can happen if we try to output a log
+                //after a test has completed (some action ocurred asynchronously).
+            }
         }
     }
 }

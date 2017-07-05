@@ -85,7 +85,7 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
         protected static void ValidatePoolInfo()
         {
             StringBuilder s = new StringBuilder();
-            Assert.InRange(SessionPool.GetPoolInfo(s), 0, 1);
+            Assert.InRange(SessionPool.Default.GetPoolInfo(s), 0, 1);
             Logger.Instance.Info(s.ToString());
 
             s.Clear();
