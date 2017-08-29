@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System.Data.Common;
 using Google.Api.Gax;
 using Google.Apis.Bigquery.v2.Data;
 using System.Linq;
@@ -29,7 +28,11 @@ namespace Google.Cloud.BigQuery.V2
         /// The SQL of the command. This must not be null by the time
         /// the command is executed.
         /// </summary>
-        public string Sql { get; set; }
+        public string Sql
+        {
+            get => CommandText;
+            set => CommandText = value;
+        }
 
         private BigQueryParameterMode _parameterMode = BigQueryParameterMode.Named;
         /// <summary>

@@ -38,6 +38,9 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <None Include="BigQueryConnection.Queries.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Update="BigQueryClient.*.cs">
       <DependentUpon>BigQueryClient.cs</DependentUpon>
     </Compile>
@@ -54,7 +57,13 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Update="BigQueryConnection.cs">
+    <Compile Update="BigQueryCommand.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="BigQueryCommand.Data.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="BigQueryConnection.Queries.cs">
       <SubType>Component</SubType>
     </Compile>
   </ItemGroup>
