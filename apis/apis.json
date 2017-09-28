@@ -374,6 +374,41 @@
   },
 
   {
+    "id": "Google.Cloud.Spanner.EntityFramework",
+    "version": "1.0.0-beta06",
+    "type": "other",
+    "targetFrameworks": "net45",
+    "testTargetFrameworks": "net452",
+    "description": "Google EntityFramework Provider for Google Cloud Spanner.",
+    "tags": [ "Spanner", "ADO", "EntityFramework" ],
+    "dependencies": {
+      "Google.Cloud.Spanner.Data": "project",
+      "Google.Cloud.Spanner.V1": "project",
+      "Google.Cloud.Spanner.Admin.Database.V1": "project",
+      "Google.Cloud.Spanner.Admin.Instance.V1": "project",
+      "Grpc.Core": "default"
+    },
+  },
+
+  {
+    "id": "Google.Cloud.Spanner.EntityFrameworkCore",
+    "version": "1.0.0-beta06",
+    "type": "other",
+    "targetFrameworks": "netstandard2.0",
+    "testTargetFrameworks": "netcoreapp2.0",
+    "description": "Google EntityFrameworkCore Provider for Google Cloud Spanner.",
+    "tags": [ "Spanner", "ADO", "EntityFramework" ],
+    "dependencies": {
+      "Google.Cloud.Spanner.Data": "project",
+      "Google.Cloud.Spanner.V1": "project",
+      "Google.Cloud.Spanner.Admin.Database.V1": "project",
+      "Google.Cloud.Spanner.Admin.Instance.V1": "project",
+      "Microsoft.EntityFrameworkCore.Relational": "2.0.0",
+      "Grpc.Core": "default"
+    },
+  },
+
+  {
     "id": "Google.Cloud.Spanner.V1",
     "productName": "Google Cloud Spanner",
     "productUrl": "https://cloud.google.com/spanner/",
