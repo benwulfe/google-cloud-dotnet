@@ -24,6 +24,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.ExpressionTranslators;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Query.Sql;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Update;
@@ -59,6 +60,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 .TryAdd<IRelationalConnection, SpannerRelationalConnection>()
                 .TryAdd<IExecutionStrategyFactory, RelationalExecutionStrategyFactory>()
                 //QUERY SERVICES
+                .TryAdd<IQueryCompiler, SpannerQueryCompiler>()
                 .TryAdd<IQueryCompilationContextFactory, SpannerQueryCompilationContextFactory>()
                 .TryAdd<IMemberTranslator, SpannerCompositeMemberTranslator>()
                 .TryAdd<ICompositeMethodCallTranslator, SpannerCompositeMethodCallTranslator>()

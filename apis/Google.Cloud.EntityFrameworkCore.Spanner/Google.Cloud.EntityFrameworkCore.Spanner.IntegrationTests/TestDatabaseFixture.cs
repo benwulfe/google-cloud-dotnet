@@ -15,8 +15,6 @@
 #region
 
 using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
 using Google.Api.Gax;
 using Google.Cloud.Spanner.Data;
@@ -44,7 +42,13 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.IntegrationTests
         private string DatabaseName { get; }  =  // "scratch";
             "t_" + Guid.NewGuid().ToString("N").Substring(0, 28);
         public int TestTableRowCount { get; } = 15;
-        public string TestTable { get; } = nameof(TestTableContext.StringTable);
+        public int BookAuthorRowCount { get; } = 25;
+        public int TypeRowCount { get; } = 100;
+
+        public string TestTableName { get; } = nameof(TestDbContext.StringTable);
+        public string BookTableName { get; } = nameof(TestDbContext.BookTable);
+        public string AuthorTableName { get; } = nameof(TestDbContext.AuthorTable);
+        public string TypeTableName { get; } = nameof(TestDbContext.AuthorTable);
 
         public TestDatabaseFixture() => _creationTask = new Lazy<Task>(EnsureTestDatabaseImplAsync);
 
@@ -73,9 +77,15 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.IntegrationTests
             await Task.Delay(1); // this line exists so the others can be commented.
             await CreateDatabaseAsync();
             await Task.WhenAll(
-                CreateTableAsync(),
+                CreateBaseTableAsync(),
+                CreateBooksTableAsync(),
+                CreateAuthorsTableAsync(),
                 CreateTypeTableAsync()).ConfigureAwait(false);
-            await Task.WhenAll(FillSampleData(TestTable));
+            await Task.WhenAll(
+                FillBaseTableAsync(),
+                FillAuthorsAsync(),
+                FillBooksAsync()
+                );
         }
 
         private async Task CreateDatabaseAsync()
@@ -87,9 +97,137 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.IntegrationTests
             }
         }
 
+        private async Task CreateBaseTableAsync()
+        {
+            string createTableStatement = $@"CREATE TABLE {TestTableName} (
+                                            Key                STRING(MAX) NOT NULL,
+                                            StringValue        STRING(MAX),
+                                          ) PRIMARY KEY (Key)";
+
+            var index1 = "CREATE INDEX TestTableByValue ON TestTable(StringValue)";
+            var index2 = "CREATE INDEX TestTableByValueDesc ON TestTable(StringValue DESC)";
+
+            await ExecuteDdlAsync(createTableStatement);
+            await ExecuteDdlAsync(index1);
+            await ExecuteDdlAsync(index2);
+        }
+
+        private async Task FillBaseTableAsync()
+        {
+            using (var connection = new SpannerConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
+                using (var tx = await connection.BeginTransactionAsync())
+                {
+                    var cmd = connection.CreateInsertCommand(
+                        TestTableName,
+                        new SpannerParameterCollection
+                        {
+                            {"Key", SpannerDbType.String},
+                            {"StringValue", SpannerDbType.String}
+                        });
+                    cmd.Transaction = tx;
+
+                    for (var i = 0; i < TestTableRowCount; ++i)
+                    {
+                        cmd.Parameters["Key"].Value = "k" + i;
+                        cmd.Parameters["StringValue"].Value = "v" + i;
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+
+                    await tx.CommitAsync();
+                }
+            }
+        }
+
+        private async Task CreateBooksTableAsync()
+        {
+            var typeTable = $@"CREATE TABLE {BookTableName} ( 
+                  ISBN                STRING(MAX) NOT NULL,
+                  Title               STRING(MAX) NOT NULL,
+                  AuthorId            STRING(MAX),
+                  PublishDate         DATE,
+                ) PRIMARY KEY (ISBN)";
+
+            await ExecuteDdlAsync(typeTable);
+        }
+
+        private async Task FillBooksAsync()
+        {
+            using (var connection = new SpannerConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
+                using (var tx = await connection.BeginTransactionAsync())
+                {
+                    var cmd = connection.CreateInsertCommand(
+                        BookTableName,
+                        new SpannerParameterCollection
+                        {
+                            {"ISBN", SpannerDbType.String},
+                            {"Title", SpannerDbType.String},
+                            {"AuthorId", SpannerDbType.String},
+                            {"PublishDate", SpannerDbType.Date}
+                        });
+                    cmd.Transaction = tx;
+
+                    for (var i = 0; i < BookAuthorRowCount; ++i)
+                    {
+                        cmd.Parameters["ISBN"].Value = "ISBN" + i;
+                        cmd.Parameters["Title"].Value = "Title" + i;
+                        cmd.Parameters["AuthorId"].Value = "AuthorId" + i;
+                        cmd.Parameters["PublishDate"].Value = DateTime.Now;
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+
+                    await tx.CommitAsync();
+                }
+            }
+        }
+
+        private async Task CreateAuthorsTableAsync()
+        {
+            var typeTable = $@"CREATE TABLE {AuthorTableName} ( 
+                  AuthorId            STRING(MAX) NOT NULL,
+                  LastName            STRING(MAX),
+                  FirstName           STRING(MAX),
+                ) PRIMARY KEY (AuthorId)";
+
+            await ExecuteDdlAsync(typeTable);
+        }
+
+        private async Task FillAuthorsAsync()
+        {
+            using (var connection = new SpannerConnection(ConnectionString))
+            {
+                await connection.OpenAsync();
+                using (var tx = await connection.BeginTransactionAsync())
+                {
+                    var cmd = connection.CreateInsertCommand(
+                        AuthorTableName,
+                        new SpannerParameterCollection
+                        {
+                            {"AuthorId", SpannerDbType.String},
+                            {"LastName", SpannerDbType.String},
+                            {"FirstName", SpannerDbType.String},
+                        });
+                    cmd.Transaction = tx;
+
+                    for (var i = 0; i < BookAuthorRowCount; ++i)
+                    {
+                        cmd.Parameters["AuthorId"].Value = "AuthorId" + i;
+                        cmd.Parameters["LastName"].Value = "LastName" + i;
+                        cmd.Parameters["FirstName"].Value = "FirstName" + i;
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+
+                    await tx.CommitAsync();
+                }
+            }
+        }
+
         private async Task CreateTypeTableAsync()
         {
-            var typeTable = @"CREATE TABLE TYPE_T ( 
+            var typeTable = $@"CREATE TABLE {TypeTableName} ( 
                   K                   STRING(MAX) NOT NULL,
                   BoolValue           BOOL,
                   Int64Value          INT64,
@@ -110,22 +248,7 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.IntegrationTests
             await ExecuteDdlAsync(typeTable);
         }
 
-        private async Task CreateTableAsync()
-        {
-            string createTableStatement = $@"CREATE TABLE {TestTable} (
-                                            Key                STRING(MAX) NOT NULL,
-                                            StringValue        STRING(MAX),
-                                          ) PRIMARY KEY (Key)";
-
-            var index1 = "CREATE INDEX TestTableByValue ON TestTable(StringValue)";
-            var index2 = "CREATE INDEX TestTableByValueDesc ON TestTable(StringValue DESC)";
-
-            await ExecuteDdlAsync(createTableStatement);
-            await ExecuteDdlAsync(index1);
-            await ExecuteDdlAsync(index2);
-        }
-
-        private async Task FillSampleData(string testTable)
+        private async Task FillTypeTableAsync()
         {
             using (var connection = new SpannerConnection(ConnectionString))
             {
@@ -133,18 +256,37 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.IntegrationTests
                 using (var tx = await connection.BeginTransactionAsync())
                 {
                     var cmd = connection.CreateInsertCommand(
-                        testTable,
+                        TypeTableName,
                         new SpannerParameterCollection
                         {
-                            {"Key", SpannerDbType.String},
-                            {"StringValue", SpannerDbType.String}
+                            {"K", SpannerDbType.String},
+                            {"BoolValue", SpannerDbType.Bool},
+                            {"Int64Value", SpannerDbType.Int64},
+                            {"Float64Value", SpannerDbType.Float64},
+                            {"StringValue", SpannerDbType.String},
+                            {"BytesValue", SpannerDbType.Bytes},
+                            {"TimestampValue", SpannerDbType.Timestamp},
+                            {"DateValue", SpannerDbType.Date},
+                            {"BoolArrayValue", SpannerDbType.ArrayOf(SpannerDbType.Bool)},
+                            {"Int64ArrayValue", SpannerDbType.ArrayOf(SpannerDbType.Int64)},
+                            {"Float64ArrayValue", SpannerDbType.ArrayOf(SpannerDbType.Float64)},
+                            {"StringArrayValue", SpannerDbType.ArrayOf(SpannerDbType.String)},
+                            {"BytesArrayValue", SpannerDbType.ArrayOf(SpannerDbType.Bytes)},
+                            {"TimestampArrayValue", SpannerDbType.ArrayOf(SpannerDbType.Timestamp)},
+                            {"DateArrayValue", SpannerDbType.ArrayOf(SpannerDbType.Date)},
                         });
                     cmd.Transaction = tx;
 
-                    for (var i = 0; i < TestTableRowCount; ++i)
+                    for (var i = 0; i < BookAuthorRowCount; ++i)
                     {
-                        cmd.Parameters["Key"].Value = "k" + i;
-                        cmd.Parameters["StringValue"].Value = "v" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
+                        cmd.Parameters["K"].Value = "AuthorId" + i;
                         await cmd.ExecuteNonQueryAsync();
                     }
 
@@ -153,10 +295,11 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.IntegrationTests
             }
         }
 
-        public async Task<TestTableContext> CreateContextAsync(Predicate<string> logFilter)
+        public async Task<TestDbContext> CreateContextAsync(Predicate<string> logFilter = null)
         {
+            logFilter = logFilter ?? (x => true);
             await EnsureTestDatabaseAsync();
-            return new TestTableContext(this, logFilter);
+            return new TestDbContext(this, logFilter);
         }
     }
 }

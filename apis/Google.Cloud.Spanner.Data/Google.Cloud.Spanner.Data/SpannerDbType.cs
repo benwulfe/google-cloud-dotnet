@@ -92,9 +92,38 @@ namespace Google.Cloud.Spanner.Data
         }
 
         /// <summary>
-        /// The string name of this type in Cloud Spanner.
+        /// The string representation of this type in Cloud Spanner.
         /// </summary>
-        public string DatabaseTypeName => this.TypeCode.GetOriginalName();
+        public string DatabaseTypeName
+        {
+            get
+            {
+                if (ArrayElementType != null)
+                {
+                    return $"ARRAY<{ArrayElementType.DatabaseTypeName}>";
+                }
+                if (StructMembers != null)
+                {
+                    var s = new StringBuilder();
+                    foreach (var keyValuePair in StructMembers)
+                    {
+                        s.Append(s.Length == 0 ? "STRUCT<" : ", ");
+                        s.Append($"{keyValuePair.Key}:{keyValuePair.Value.DatabaseTypeName}");
+                    }
+                    s.Append(">");
+                    return s.ToString();
+                }
+                return TypeCode.GetOriginalName();
+            }
+        }
+
+        /// <summary>
+        /// Given a string representation, returns an instance of <see cref="SpannerDbType"/>.
+        /// </summary>
+        public static bool TryParse(string databaseTypeName, out SpannerDbType spannerDbType)
+        {
+            
+        }
 
         /// <summary>
         /// The corresponding <see cref="DbType"/> for this Cloud Spanner type.
@@ -109,29 +138,7 @@ namespace Google.Cloud.Spanner.Data
         /// <inheritdoc />
         public override string ToString()
         {
-            if (ArrayElementType != null)
-            {
-                return $"ArrayOf({ArrayElementType})";
-            }
-            if (StructMembers != null)
-            {
-                StringBuilder s = new StringBuilder();
-                foreach (var keyValuePair in StructMembers)
-                {
-                    if (s.Length == 0)
-                    {
-                        s.Append("StructOf(");
-                    }
-                    else
-                    {
-                        s.Append(", ");
-                    }
-                    s.Append($"key:{keyValuePair.Key} type:{keyValuePair.Value}");
-                }
-                s.Append(")");
-                return s.ToString();
-            }
-            return TypeCode.ToString();
+            return DatabaseTypeName;
         }
 
         internal static SpannerDbType FromProtobufType(V1.Type type)

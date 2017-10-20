@@ -12,8 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
+using Google.Api.Gax;
 using Microsoft.EntityFrameworkCore.Query.Expressions;
 using Microsoft.EntityFrameworkCore.Query.Sql;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Google.Cloud.EntityFrameworkCore.Spanner.Query.Sql.Internal
 {

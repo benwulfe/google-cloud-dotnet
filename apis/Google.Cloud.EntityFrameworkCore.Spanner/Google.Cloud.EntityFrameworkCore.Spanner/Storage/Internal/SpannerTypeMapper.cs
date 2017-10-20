@@ -25,40 +25,45 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.Storage.Internal
     /// </summary>
     public class SpannerTypeMapper : RelationalTypeMapper
     {
-        private static readonly BoolTypeMapping s_bool = new BoolTypeMapping(SpannerDbType.Bool.DatabaseTypeName);
-        private static readonly DateTimeTypeMapping s_date =
-            new DateTimeTypeMapping(SpannerDbType.Date.DatabaseTypeName, DbType.Date);
-        private static readonly DateTimeTypeMapping s_datetime =
-            new DateTimeTypeMapping(SpannerDbType.Timestamp.DatabaseTypeName, DbType.DateTime);
+        private static readonly BoolTypeMapping s_bool
+            = new BoolTypeMapping(SpannerDbType.Bool.DatabaseTypeName);
+        private static readonly DateTimeTypeMapping s_date
+            = new DateTimeTypeMapping(SpannerDbType.Date.DatabaseTypeName, DbType.DateTime);
+        private static readonly DateTimeTypeMapping s_datetime
+            = new DateTimeTypeMapping(SpannerDbType.Timestamp.DatabaseTypeName, DbType.DateTime);
         private static readonly StringTypeMapping s_defaultString
             = new StringTypeMapping(SpannerDbType.String.DatabaseTypeName, DbType.String, true);
-        private static readonly DoubleTypeMapping s_double = new DoubleTypeMapping(SpannerDbType.Float64.DatabaseTypeName);
-        private static readonly LongTypeMapping s_long =
-            new LongTypeMapping(SpannerDbType.Int64.DatabaseTypeName, DbType.Int64);
-
-        private static readonly Dictionary<string, RelationalTypeMapping> s_storeTypeMappings 
-            = new Dictionary<string, RelationalTypeMapping>(StringComparer.OrdinalIgnoreCase)
-        {
-            {s_long.StoreType, s_long},
-            {s_bool.StoreType, s_bool},
-            {s_date.StoreType, s_date},
-            {s_datetime.StoreType, s_datetime},
-            {s_double.StoreType, s_double},
-            {s_defaultString.StoreType, s_defaultString}
-        };
+        private static readonly DoubleTypeMapping s_double
+            = new DoubleTypeMapping(SpannerDbType.Float64.DatabaseTypeName);
+        private static readonly LongTypeMapping s_long 
+            = new LongTypeMapping(SpannerDbType.Int64.DatabaseTypeName, DbType.Int64);
 
         private static readonly Dictionary<System.Type, RelationalTypeMapping> s_clrTypeMappings
             = new Dictionary<System.Type, RelationalTypeMapping>
+        {
+            {typeof(int), s_long },
+            {typeof(long), s_long },
+            {typeof(uint), s_long},
+            {typeof(bool), s_bool},
+            {typeof(DateTime), s_datetime},
+            {typeof(float), s_double},
+            {typeof(double), s_double},
+            {typeof(string), s_defaultString}
+        };
+
+        private static readonly Dictionary<SpannerDbType, RelationalTypeMapping> s_dbTypeMappings
+            = new Dictionary<SpannerDbType, RelationalTypeMapping>
             {
-                {typeof(int), s_long},
-                {typeof(long), s_long},
-                {typeof(uint), s_long},
-                {typeof(bool), s_long},
-                {typeof(DateTime), s_long},
-                {typeof(float), s_double},
-                {typeof(double), s_double},
-                {typeof(string), s_defaultString}
+                { SpannerDbType.Bool, s_bool },
+                { SpannerDbType.Bytes, null },
+                { SpannerDbType.Date, s_date },
+                { SpannerDbType.Float64, s_double },
+                { SpannerDbType.Int64, s_long },
+                { SpannerDbType.Timestamp, s_datetime },
+                { SpannerDbType.String, s_defaultString },
+                { SpannerDbType.Unspecified, null },
             };
+
 
         /// <summary>
         /// </summary>
@@ -77,6 +82,15 @@ namespace Google.Cloud.EntityFrameworkCore.Spanner.Storage.Internal
 
         /// <inheritdoc />
         protected override IReadOnlyDictionary<string, RelationalTypeMapping> GetStoreTypeMappings()
-            => s_storeTypeMappings;
+            => null;
+
+        /// <inheritdoc />
+        protected override RelationalTypeMapping CreateMappingFromStoreType(string storeType)
+        {
+            if (SpannerDbType.TryParse(storeType, out SpannerDbType parsedType))
+            {
+                switch(parsedType.)
+            }
+        }
     }
 }
